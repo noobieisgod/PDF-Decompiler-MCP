@@ -9,8 +9,6 @@ Instead of treating a PDF as one large response, the project is being redesigned
 1. Decompose and index the document once.
 2. Retrieve only the pages, blocks, tables, figures, or rendered regions needed for the current task.
 
-> **Project status:** Active redesign. This repository was previously named **Lightweight PDF MCP for Claude AI**. Existing releases remain available for historical use, but the next major version changes the product positioning, repository structure, MCP tool surface, caching model, and retrieval behavior.
-
 ## Why the project was renamed
 
 The original project claimed to make PDF use substantially cheaper. Testing showed that this was not a reliable universal claim.
@@ -18,8 +16,6 @@ The original project claimed to make PDF use substantially cheaper. Testing show
 A structured multimodal response can cost more than a text-focused PDF path because it may include extracted text, tables, images, screenshots, annotations, page structure, and fallback renders. That additional context can improve document fidelity, especially for charts, diagrams, screenshots, scanned pages, and complex layouts, but it can also increase token consumption.
 
 The new name describes what the server is intended to do without promising a particular cost outcome:
-
-> PDF Decompiler MCP decomposes a PDF into reusable, addressable document components and lets an AI agent retrieve those components selectively.
 
 Token use is workload-dependent. It varies with the selected retrieval mode, document type, number and resolution of images, amount of returned text, client implementation, model, and token-accounting method.
 
