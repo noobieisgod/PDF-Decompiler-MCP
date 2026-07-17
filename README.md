@@ -1,7 +1,5 @@
 # PDF Decompiler MCP
 
-**Structured, selective, multimodal PDF access for AI agents.**
-
 PDF Decompiler MCP is a local-first Model Context Protocol server that decomposes PDF documents into addressable text, tables, figures, annotations, metadata, OCR output, and page-level structures.
 
 Instead of treating a PDF as one large response, the project is being redesigned around a two-step model:
@@ -33,6 +31,7 @@ In this project, **decompiler** means converting a PDF from its page-oriented re
 - OCR output for scanned pages
 - page dimensions, rotation, and layout coordinates
 - stable IDs for pages and document elements
+- extracted images
 
 The project does not claim to reconstruct the original source document, authoring application, or editable layout with perfect fidelity.
 
