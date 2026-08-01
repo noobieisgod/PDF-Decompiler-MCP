@@ -1,0 +1,6 @@
+node_modules/
+artifacts/
+.tmp-*/
+*.pdf
+.DS_Store
+Thumbs.db

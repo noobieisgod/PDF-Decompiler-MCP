@@ -1,0 +1,113 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "documentId": {
+      "type": "string",
+      "pattern": "^doc_[a-f0-9]{64}$",
+      "description": "Identifier derived from the exact PDF bytes."
+    },
+    "extractionFingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$",
+      "description": "Exact extraction generation to resolve."
+    },
+    "page": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 9007199254740991
+    },
+    "bbox": {
+      "type": "array",
+      "items": [
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        },
+        {
+          "type": "number"
+        }
+      ]
+    },
+    "format": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "png",
+        "jpeg"
+      ]
+    },
+    "maxDimension": {
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 4096
+    },
+    "imageDelivery": {
+      "description": "Auto conservatively returns a resource. Inline must be explicitly requested.",
+      "type": "string",
+      "enum": [
+        "auto",
+        "resource",
+        "inline"
+      ]
+    },
+    "budget": {
+      "type": "object",
+      "properties": {
+        "estimatedTokens": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "responseBytes": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "pages": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "textBlocks": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "tables": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "figures": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "renderedPages": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        },
+        "imageDimension": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 9007199254740991
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "documentId",
+    "extractionFingerprint",
+    "page"
+  ],
+  "additionalProperties": false,
+  "$id": "https://github.com/noobieisgod/PDF-Decompiler-MCP/schemas/pdf_render_page.input.schema.json"
+}

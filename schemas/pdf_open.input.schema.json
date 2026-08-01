@@ -1,0 +1,61 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "source": {
+      "description": "HTTPS URL or local PDF path permitted by the configured local-file policy.",
+      "type": "string",
+      "minLength": 1
+    },
+    "pages": {
+      "minItems": 1,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "start": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          },
+          "end": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 9007199254740991
+          }
+        },
+        "additionalProperties": false
+      }
+    },
+    "maxImageDimension": {
+      "type": "integer",
+      "minimum": 64,
+      "maximum": 4096
+    },
+    "refresh": {
+      "type": "boolean"
+    },
+    "ocrPolicy": {
+      "type": "string",
+      "enum": [
+        "auto",
+        "off",
+        "required"
+      ]
+    },
+    "cursor": {
+      "type": "string",
+      "minLength": 1
+    },
+    "documentId": {
+      "type": "string",
+      "pattern": "^doc_[a-f0-9]{64}$"
+    },
+    "extractionFingerprint": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    }
+  },
+  "additionalProperties": false,
+  "$id": "https://github.com/noobieisgod/PDF-Decompiler-MCP/schemas/pdf_open.input.schema.json"
+}

@@ -1,0 +1,92 @@
+{
+    "name": "pdf-decompiler-mcp",
+    "version": "3.0.0",
+    "private": true,
+    "type": "module",
+    "description": "Local-first MCP server for bounded, cited PDF decomposition and retrieval",
+    "license": "AGPL-3.0-only",
+    "author": "Eric Lee (noobieisgod)",
+    "repository": {
+        "type": "git",
+        "url": "git+https://github.com/noobieisgod/PDF-Decompiler-MCP.git"
+    },
+    "homepage": "https://github.com/noobieisgod/PDF-Decompiler-MCP#readme",
+    "bugs": {
+        "url": "https://github.com/noobieisgod/PDF-Decompiler-MCP/issues"
+    },
+    "keywords": ["pdf", "mcp", "retrieval", "ocr", "local-first"],
+    "bin": {
+        "pdf-decompiler-mcp": "./src/index.mjs"
+    },
+    "files": [
+        "src",
+        "schemas",
+        "docs",
+        "manifest.json",
+        "examples",
+        "README.md",
+        "LICENSE",
+        "NOTICE",
+        "THIRD_PARTY_NOTICES.md",
+        "SECURITY.md",
+        "CHANGELOG.md"
+    ],
+    "scripts": {
+        "start": "node src/index.mjs",
+        "check": "node scripts/check-repository.mjs",
+        "repo:verify": "node scripts/check-repository.mjs",
+        "test": "node --test --test-concurrency=1",
+        "test:smoke": "node --test test/server-smoke.test.mjs",
+        "test:mcp-protocol": "node --test test/mcp-protocol.test.mjs",
+        "test:model": "node --test test/model.test.mjs",
+        "test:decomposition": "node --test test/decomposition.test.mjs",
+        "test:security": "node --test test/security.test.mjs",
+        "test:platform-fs": "node --test test/platform-filesystem.test.mjs",
+        "test:ocr": "node --test test/ocr-integration.test.mjs",
+        "test:cache": "node --test test/cache.test.mjs",
+        "test:search:bm25": "node --test test/search-bm25.test.mjs",
+        "test:search:semantic": "node --test test/search-semantic.test.mjs",
+        "test:mcp": "node --test test/mcp-tools.test.mjs",
+        "test:budgets": "node --test test/budgets.test.mjs",
+        "test:cursors": "node --test test/cursors.test.mjs",
+        "test:migration": "node --test test/migration.test.mjs",
+        "test:compat": "node --test test/compatibility.test.mjs",
+        "docs:check": "node scripts/check-docs.mjs",
+        "benchmark": "node scripts/benchmark.mjs",
+        "license:check": "node scripts/check-licenses.mjs",
+        "sbom": "node scripts/generate-sbom.mjs",
+        "package:verify": "node scripts/verify-packages.mjs",
+        "release:verify": "node scripts/release-verify.mjs",
+        "verify:extract": "node scripts/verify-extract.mjs",
+        "schemas:generate": "node scripts/generate-schemas.mjs",
+        "fixtures:generate": "node test/fixtures/generate-fixtures.mjs",
+        "audit": "npm audit --audit-level=high"
+    },
+    "dependencies": {
+        "@modelcontextprotocol/server": "2.0.0",
+        "mupdf": "1.27.0",
+        "pdfjs-dist": "5.5.207",
+        "zod": "4.3.6"
+    },
+    "devDependencies": {
+        "@anthropic-ai/mcpb": "2.1.2",
+        "@modelcontextprotocol/client": "2.0.0"
+    },
+    "optionalDependencies": {
+        "@napi-rs/canvas": "0.1.97"
+    },
+    "peerDependencies": {
+        "@huggingface/transformers": "4.2.0"
+    },
+    "peerDependenciesMeta": {
+        "@huggingface/transformers": {
+            "optional": true
+        }
+    },
+    "overrides": {
+        "tmp": "0.2.7"
+    },
+    "engines": {
+        "node": "^22.0.0 || ^24.0.0"
+    }
+}

@@ -1,0 +1,58 @@
+{
+  "$schema": "https://raw.githubusercontent.com/modelcontextprotocol/mcpb/v2.1.2/schemas/mcpb-manifest-v0.4.schema.json",
+  "manifest_version": "0.4",
+  "name": "pdf-decompiler-mcp",
+  "display_name": "PDF Decompiler MCP",
+  "version": "3.0.0",
+  "description": "Local-first, bounded and cited PDF decomposition and retrieval over MCP.",
+  "author": {
+    "name": "Eric Lee (noobieisgod)",
+    "url": "https://github.com/noobieisgod"
+  },
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/noobieisgod/PDF-Decompiler-MCP.git"
+  },
+  "homepage": "https://github.com/noobieisgod/PDF-Decompiler-MCP",
+  "documentation": "https://github.com/noobieisgod/PDF-Decompiler-MCP#readme",
+  "support": "https://github.com/noobieisgod/PDF-Decompiler-MCP/issues",
+  "server": {
+    "type": "node",
+    "entry_point": "src/index.mjs",
+    "mcp_config": {
+      "command": "node",
+      "args": [
+        "${__dirname}/src/index.mjs",
+        "--allow-root",
+        "${user_config.allowed_directories}"
+      ],
+      "env": {}
+    }
+  },
+  "user_config": {
+    "allowed_directories": {
+      "type": "directory",
+      "title": "Allowed PDF directories",
+      "description": "Select the directories from which this server may open local PDFs.",
+      "multiple": true,
+      "required": true
+    }
+  },
+  "tools": [
+    { "name": "pdf_open", "description": "Open, validate, decompose, index, or load a PDF generation." },
+    { "name": "pdf_document_info", "description": "Return document, decomposition, cache, warning, and resource-lifetime information." },
+    { "name": "pdf_search", "description": "Search with BM25 or optional semantic and hybrid retrieval." },
+    { "name": "pdf_get_pages", "description": "Retrieve cited page elements under explicit modes and budgets." },
+    { "name": "pdf_get_element", "description": "Resolve one element in an exact extraction generation." },
+    { "name": "pdf_render_page", "description": "Render a bounded page or crop as inline image content or an immutable resource." },
+    { "name": "pdf_close", "description": "Release an active document and optionally delete its cache generation." }
+  ],
+  "keywords": ["pdf", "mcp", "retrieval", "local-first"],
+  "license": "AGPL-3.0-only",
+  "compatibility": {
+    "platforms": ["darwin", "win32", "linux"],
+    "runtimes": {
+      "node": "^22.0.0 || ^24.0.0"
+    }
+  }
+}

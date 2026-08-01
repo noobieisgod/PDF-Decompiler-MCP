@@ -1,441 +1,178 @@
 # PDF Decompiler MCP
 
-PDF Decompiler MCP is a local-first Model Context Protocol server that decomposes PDF documents into addressable text, tables, figures, annotations, metadata, OCR output, and page-level structures.
+PDF Decompiler MCP is a local-first Model Context Protocol server for bounded, cited PDF decomposition and selective retrieval. It converts an exact PDF byte stream into a canonical model of pages, text blocks, tables and cells, figures, links, annotations, metadata, outlines, OCR output, and on-demand renders.
 
-Instead of treating a PDF as one large response, the project is being redesigned around a two-step model:
+Version 3.0.0 is implemented in this source tree but has not been published. Package publication, release creation, and the final npm name check require separate authorization.
 
-1. Decompose and index the document once.
-2. Retrieve only the pages, blocks, tables, figures, or rendered regions needed for the current task.
+## Requirements
 
-## Why the project was renamed
+- Node.js 22 or 24. CI tests both versions on Windows, macOS, and Linux.
+- npm 10 or newer.
+- Optional Tesseract executable on `PATH` for OCR.
+- Optional `@huggingface/transformers@4.2.0` peer dependency for semantic retrieval.
 
-The original project claimed to make PDF use substantially cheaper. Testing showed that this was not a reliable universal claim.
+Node.js 18 and 20 are not supported. The server uses the stable MCP TypeScript SDK v2 packages, pinned at 2.0.0, whose server package requires Node.js 20 or newer. This project deliberately tests and supports the active Node.js 22 and 24 release lines.
 
-A structured multimodal response can cost more than a text-focused PDF path because it may include extracted text, tables, images, screenshots, annotations, page structure, and fallback renders. That additional context can improve document fidelity, especially for charts, diagrams, screenshots, scanned pages, and complex layouts, but it can also increase token consumption.
+## Install from source
 
-The new name describes what the server is intended to do without promising a particular cost outcome:
+```powershell
+git clone https://github.com/noobieisgod/PDF-Decompiler-MCP.git
+cd PDF-Decompiler-MCP
+npm ci
+npm test
+node src/index.mjs --allow-root C:\path\to\pdfs
+```
 
-Token use is workload-dependent. It varies with the selected retrieval mode, document type, number and resolution of images, amount of returned text, client implementation, model, and token-accounting method.
+The server uses stdio. Protocol messages are written to stdout and diagnostics are restricted to stderr.
 
-## What “decompiler” means here
-
-In this project, **decompiler** means converting a PDF from its page-oriented representation into a canonical document model that exposes useful elements such as:
-
-- document metadata and outline entries
-- page text and reading order
-- headings and text blocks
-- structured tables and cells
-- embedded figures and captions
-- page renders and cropped regions
-- links and annotations
-- OCR output for scanned pages
-- page dimensions, rotation, and layout coordinates
-- stable IDs for pages and document elements
-- extracted images
-
-The project does not claim to reconstruct the original source document, authoring application, or editable layout with perfect fidelity.
-
-## Design goals
-
-PDF Decompiler MCP is designed around the following goals:
-
-- **Selective retrieval:** Return only the evidence needed for a task.
-- **Multimodal access:** Preserve access to visual content when text alone is insufficient.
-- **Stable citations:** Keep every result traceable to its document, page, and source element.
-- **Budget awareness:** Enforce configurable limits for text, images, pages, response bytes, and estimated tokens.
-- **Local-first operation:** Process documents locally by default and avoid external AI or embedding services unless explicitly configured.
-- **Reusable decomposition:** Parse a document once, cache the result, and reuse it across multiple questions.
-- **Client independence:** Support MCP-compatible clients without making one model or vendor part of the project identity.
-- **Transparent benchmarking:** Compare cost, latency, reliability, and answer quality using reproducible configurations.
-
-## Current and planned capabilities
-
-The next major version is being developed in phases. Do not treat planned items as released until they appear in a tagged release and the compatibility matrix marks them as verified.
-
-| Capability | Legacy releases | Next major version target |
-|---|---:|---:|
-| Page text extraction | Available | Retained and modularized |
-| Metadata and outline extraction | Available | Retained with stable schemas |
-| Header and footer filtering | Available | Retained with diagnostics |
-| Structured table extraction | Available | Expanded with independent retrieval |
-| Embedded image extraction | Available | Expanded with stable figure IDs |
-| Full-page visual fallback | Available | Converted to on-demand rendering where possible |
-| OCR through Tesseract | Available | Expanded with timeouts and page-level diagnostics |
-| Page-range extraction | Available | Replaced by selective page and element retrieval |
-| Stable document handles | Not available | Planned |
-| Persistent cache | Not available | Planned |
-| Text, balanced, and fidelity modes | Not available | Planned |
-| Full-text retrieval index | Not available | Planned |
-| Optional semantic retrieval | Not available | Planned |
-| Token and response budgets | Limited | Planned |
-| Continuation cursors | Not available | Planned |
-| Page-level and element-level citations | Limited | Planned |
-| Client capability fallbacks | Limited | Planned |
-| Reproducible benchmark suite | Partial manual tests | Planned |
-
-## Retrieval modes
-
-The next major version will expose retrieval modes as presets over explicit parameters.
-
-### Text mode
-
-Returns text, headings, metadata, annotations, and compact table representations. Images and page renders are omitted unless explicitly requested.
-
-Best for text-heavy reports, papers, books, policies, and contracts.
-
-### Balanced mode
-
-Returns relevant text and tables, then includes figures or page regions when visual evidence is likely to improve the answer.
-
-Best for mixed-layout documents, technical manuals, financial reports, and documents containing occasional charts or screenshots.
-
-### Fidelity mode
-
-Returns all supported elements within an explicitly selected scope, such as a page range or list of element IDs.
-
-Fidelity mode is not intended to dump an unlimited document. It remains subject to configured page, byte, image, and token budgets.
-
-## Target MCP tool surface
-
-The redesigned server is planned around small, composable tools rather than one all-purpose extraction response.
+## Seven composable tools
 
 | Tool | Purpose |
 |---|---|
-| `pdf_open` | Validate, decompose, index, or load a PDF from cache and return a document handle. |
-| `pdf_document_info` | Return metadata, outline, page classifications, element counts, warnings, and cache information. |
-| `pdf_search` | Search text, headings, OCR, captions, annotations, and table cells under explicit filters and budgets. |
-| `pdf_get_pages` | Retrieve selected pages using text, balanced, or fidelity settings. |
-| `pdf_get_element` | Retrieve identified text blocks, tables, figures, annotations, or regions. |
-| `pdf_render_page` | Render a page or bounding box only when visual inspection is needed. |
-| `pdf_close` | Release an active document session and optionally preserve or remove cached state. |
+| `pdf_open` | Validate, decompose, index, resume, or load an exact PDF generation. |
+| `pdf_document_info` | Report metadata, decomposition, diagnostics, cache state, leases, and resource lifetime. |
+| `pdf_search` | Search with deterministic BM25, optional semantic retrieval, or reciprocal-rank fusion. |
+| `pdf_get_pages` | Return selected cited elements in text, balanced, or fidelity mode under explicit budgets. |
+| `pdf_get_element` | Resolve one element only in its expected extraction generation. |
+| `pdf_render_page` | Render a bounded page or crop as PNG or JPEG, returned inline only by explicit request. |
+| `pdf_close` | Release an open document and optionally delete its persistent generation. |
 
-The legacy `extract_pdf_content` tool may remain temporarily as a deprecated compatibility wrapper during migration. Its final availability will be documented in release notes.
-
-## Canonical document model
-
-A decomposed document is expected to contain stable, serializable records for:
-
-- document identity, source, hash, metadata, outline, and warnings
-- pages, dimensions, rotation, extraction method, and content classification
-- text blocks, bounding boxes, reading order, and heading information
-- tables, cells, headers, confidence, and optional rendered previews
-- figures, captions, dimensions, hashes, and deduplication references
-- annotations, links, authors, contents, and coordinates
-- citations that connect every result to a page and element ID
-
-See [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md) for the target architecture.
-
-## Selective retrieval and RAG
-
-The planned retrieval layer will index:
-
-- page text
-- text blocks and headings
-- OCR output
-- figure captions
-- annotation text
-- table headers and cells
-- metadata and outline entries
-
-The initial implementation should use deterministic local full-text retrieval. Optional embeddings may be added later for semantic or hybrid ranking.
-
-Semantic retrieval will remain optional. The base server should work without an external embedding service or API key.
-
-## Budget controls
-
-Retrieval requests are planned to support limits such as:
-
-- maximum estimated output tokens
-- maximum response bytes
-- maximum pages
-- maximum text blocks
-- maximum tables
-- maximum figures
-- maximum rendered pages
-- maximum image dimensions
-
-Responses should report what was returned, what was omitted, why it was omitted, the estimated budget used, and whether more results are available through a continuation cursor.
-
-Token estimates are approximate unless a client or model-specific tokenizer is configured.
-
-## Page and element citations
-
-Every retrieved result should remain traceable to its source through:
-
-- document ID
-- page number
-- element ID
-- element type
-- bounding box where applicable
-- source excerpt or label
-- retrieval score where applicable
-
-Generated summaries should cite underlying source elements rather than becoming the only evidence record.
-
-## Installation
-
-The source tree and installation process are being normalized for the next major version. Until a tagged pre-release is published, use the latest legacy release for existing behavior or follow the development instructions after the new source layout lands.
-
-### Development installation target
-
-Requirements:
-
-- Node.js 18 or later
-- npm
-- Tesseract 5.x for OCR support
-- a supported native canvas package for image extraction and rendering
-
-```bash
-# After the repository is renamed
-git clone https://github.com/noobieisgod/PDF-Decompiler-MCP.git
-cd PDF-Decompiler-MCP
-npm install
-npm run build
-```
-
-Run the server through stdio:
-
-```bash
-node dist/server.js --stdio
-```
-
-The exact entry point may change before the first pre-release. Tagged releases are the source of truth for installation commands.
-
-## MCP client configuration
-
-A development configuration is expected to use a local Node.js entry point:
+Every successful tool result uses the same structured envelope:
 
 ```json
 {
-  "mcpServers": {
-    "pdf-decompiler": {
-      "command": "node",
-      "args": [
-        "C:/path/to/PDF-Decompiler-MCP/dist/server.js",
-        "--stdio"
-      ]
-    }
-  }
+  "schemaVersion": "3.0.0",
+  "operation": "pdf_search",
+  "documentId": "doc_<sha256>",
+  "extractionFingerprint": "<sha256>",
+  "data": {},
+  "citations": [],
+  "warnings": [],
+  "diagnostics": null,
+  "omissions": [],
+  "budget": null,
+  "nextCursor": null
 }
 ```
 
-Use forward slashes in Windows JSON paths. Restart the MCP client after changing its configuration.
+The server also returns a compact text fallback. Every returned element has a citation containing its document, extraction generation, page, element ID, and location when available. Generated schemas are in [`schemas/`](schemas/), and the complete contract is in [`docs/TOOLS.md`](docs/TOOLS.md).
 
-A future npm-published configuration may look like this:
+The legacy `extract_pdf_content` tool has been removed and is not aliased. See [`MIGRATION.md`](MIGRATION.md) for side-by-side workflows, renamed settings, client examples, and cases that no longer have a one-call equivalent.
 
-```json
-{
-  "mcpServers": {
-    "pdf-decompiler": {
-      "command": "npx",
-      "args": [
-        "-y",
-        "pdf-decompiler-mcp",
-        "--stdio"
-      ]
-    }
-  }
-}
+## Document and generation identity
+
+`documentId` is derived from exact PDF bytes. `extractionFingerprint` binds the schema version, extractor version, deterministic dependency fingerprint, OCR policy, and relevant configuration. Element IDs are stable only when all of those inputs and deterministic dependency behavior remain unchanged.
+
+Every element, citation, asset, render, canonical export, and `pdf-decompiler://` resource URI carries the extraction fingerprint. A reference from another generation returns a structured stale-reference error. Active cached generations are immutable and protected by leases during retrieval, rendering, rebuilds, deletion, and eviction.
+
+## Partial decomposition and budgets
+
+`pdf_open` can decompose selected page intervals. The result remains partial until continuation cursors process every missing interval. Search and retrieval operate on the available generation without pretending omitted pages were processed.
+
+Hard limits apply to document bytes, page counts, page selection, wall-clock processing, subprocess output, response bytes, rendered pages, image dimensions, and decompressed output at page boundaries. Native memory enforcement is operating-system enforced through `prlimit` on supported Linux hosts. Windows and macOS monitor working set and terminate the child after a threshold violation, so they provide bounded best-effort enforcement rather than a false hard-memory guarantee. The enforcement class is returned in diagnostics.
+
+Result budgets cover estimated text tokens, response bytes, pages, text blocks, tables, figures, rendered pages, and image dimensions. Oversized results are omitted with diagnostics and a continuation cursor instead of exceeding the limit.
+
+Cursors are versioned, base64url encoded, expire, and are authenticated with an HMAC key identified by `kid`. They bind the document, extraction generation, operation, normalized arguments, and search-query digest. Payloads contain no plaintext query, path, document metadata, or extracted content. Cursors are signed, not encrypted. Key rotation may retain the previous key deliberately or retire it and invalidate outstanding cursors.
+
+## Retrieval
+
+BM25 full-text retrieval is local, deterministic, available offline, and indexes normalized element text, positions, metadata, and outline entries.
+
+Semantic and hybrid retrieval are optional and disabled by default. The implementation pins the FP32 `onnx-community/all-MiniLM-L6-v2-ONNX` model, exact repository commit, ONNX and tokenizer files, checksums, 384-dimensional mean pooling, and L2 normalization. It does not claim q8 quantization. If the optional package, model files, download, or loading is unavailable, search returns BM25 results with a warning. Hybrid mode uses reciprocal-rank fusion with `k = 60`. See [`docs/SEMANTIC-MODEL.md`](docs/SEMANTIC-MODEL.md) for the immutable artifact manifest and licenses.
+
+## Local-file security
+
+Local access is denied by default until at least one allow root is configured. Paths are resolved to canonical real paths before policy evaluation. Deny roots take precedence over allow roots. Traversal, symlink and junction escapes, device and special paths, Windows reserved names, alternate data streams, and unauthorized UNC paths are rejected. Windows path comparison normalizes drive-letter case and separators.
+
+Configure roots with repeated CLI values:
+
+```powershell
+node src/index.mjs --allow-root C:\documents D:\reports --deny-root C:\documents\private
 ```
 
-Do not use the npm example until the package is published and its release notes confirm the command.
+Unrestricted local access requires the explicit `--unrestricted-local-access` flag or corresponding environment setting. UNC access requires a separate explicit opt-in. HTTPS loading rejects credentials, non-HTTPS schemes, special or private network ranges, prohibited IPv6 transition ranges, overlong redirects, oversized responses, and DNS rebinding by connecting only to the addresses validated for each redirect.
 
-## Example workflows
+The server sends no telemetry. Details and threat boundaries are in [`SECURITY.md`](SECURITY.md).
 
-These examples describe the intended redesigned workflow.
+## Cache modes and privacy
 
-### Open and inspect a document
+| Mode | Behavior | Resource URI lifetime |
+|---|---|---|
+| `persistent` | Content-addressed immutable generations survive restarts. | Until that generation is deleted, evicted, corrupted, or administratively unavailable. |
+| `ephemeral` | Owner-restricted process-local working state supports the multi-call API. | While the owning process and document state remain active. |
+| `none` | No reusable persistent cache; each open document retains only isolated process-local state. | Until that document closes or the owning process ends. |
+
+No-cache mode never writes document data into the persistent cache tree. Closing one document does not delete another document's temporary state. Process shutdown and unrecoverable failures clean local state, and startup cleanup removes abandoned process directories only when ownership and age can be validated.
+
+Persistent generations use atomic staging and replacement, hashes, corruption recovery, locks, leases, configurable retention, size-bounded LRU eviction, and active-document protection. Cache status reports the location, permission result, retention, size limit, and stored data classes. On supported POSIX systems directories use mode `0700` and files `0600`; Windows uses owner ACLs through `icacls`. Shared roots are rejected by default and require an explicit opt-in, but each OS user still receives a separate namespace.
+
+The cache can contain original PDFs, extracted text, images, renders, indexes, metadata, and embeddings. Review backup policy and enable full-disk encryption where document sensitivity requires it. [`docs/PRIVACY.md`](docs/PRIVACY.md) lists exactly what is stored, retention behavior, deletion semantics, and verification limits.
+
+## Image delivery and resources
+
+The selected MCP SDK and protocol do not negotiate a generic inline-image capability. `imageDelivery: "auto"` therefore returns an immutable read-only resource link plus a textual URI fallback. `imageDelivery: "inline"` is an explicit caller choice and remains bounded by response and image budgets. `imageDelivery: "resource"` always returns the URI.
+
+Old resource URIs are never silently regenerated under another extraction fingerprint. Structured errors distinguish closed documents, expired process-local state, deleted or evicted generations, stale fingerprints, corrupt generations, and missing assets.
+
+## Configuration
+
+CLI options:
 
 ```text
-Open this PDF with PDF Decompiler MCP and report its page count, outline, number of tables, number of figures, and any scanned pages: PDF_PATH
+--allow-root <dir...>
+--deny-root <dir...>
+--cache-mode persistent|ephemeral|none
+--cache-directory <dir>
+--unrestricted-local-access
+--allow-unc
+--debug
 ```
 
-### Text-focused analysis
+Environment variables use the `PDF_DECOMPILER_` prefix. Root lists are JSON arrays. Numeric values are validated as finite positive limits before the server starts. See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) for every variable, default, precedence rule, and security implication.
 
-```text
-Use text mode to find the document's recommendations. Cite the relevant pages and do not retrieve images unless the text is insufficient.
+## Development and validation
+
+```powershell
+npm ci
+npm run fixtures:generate
+npm run schemas:generate
+npm test
+npm run check
+npm run docs:check
+npm run license:check
+npm audit --audit-level=high
+npm run benchmark
+npm run package:verify -- artifacts\package-verification
 ```
 
-### Table retrieval
+Fixtures are generated from source and contain no third-party document content. CI runs Node.js 22 and 24 on Windows, macOS, and Linux, plus an OCR integration job and package inspection job. Platform-specific tests run only where the host supports drive casing, UNC paths, symlinks, junctions, ACLs, permission denial, process monitoring, and atomic filesystem semantics.
 
-```text
-Search this document for the revenue table, retrieve the structured table, and cite its page and table ID.
-```
+The official MCP TypeScript client 2.0.0 passes the automated protocol suite. MCP Inspector CLI 2.0.0 completes JSON `tools/list` over stdio and exposes all seven input and output schemas. Other Inspector behaviors and external desktop clients remain explicitly partial or untested in [`docs/CLIENT-COMPATIBILITY.md`](docs/CLIENT-COMPATIBILITY.md).
 
-### Visual analysis
+Benchmark output reports observed medians and fixture details. The project makes no universal latency, accuracy, or token-savings claim. See [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
 
-```text
-Find the figure discussing system architecture. Retrieve the caption and relevant text first, then retrieve the figure if visual inspection is necessary.
-```
+## Packaging and release status
 
-### Budget-controlled retrieval
+The repository can build and inspect an npm tarball and MCPB bundle, generate SHA-256 checksums, and produce an SPDX SBOM without publishing. `package.json` remains private so publication cannot occur accidentally. Package-name availability and ownership must be checked immediately before an authorized release. A name conflict must be reported and must not trigger an automatic rename or publication under another name.
 
-```text
-Answer using at most the configured retrieval budget. Prefer relevant text and tables, omit decorative images, and list any evidence that could not fit.
-```
+Relicensing and publication remain gated by the ownership, provenance, dependency, native binary, MuPDF, PDF.js, OCR, fixture, bundled asset, model, tokenizer, notice, source-distribution, npm-content, MCPB-content, and SBOM review in [`docs/PROVENANCE.md`](docs/PROVENANCE.md). See [`docs/RELEASE.md`](docs/RELEASE.md) for the complete release gate.
 
-## Supported PDF categories
+## Documentation
 
-The benchmark suite will include:
-
-- text-heavy documents
-- image-heavy documents
-- scanned documents
-- table-heavy documents
-- mixed-content reports
-- multi-column papers
-- forms
-- financial reports
-- manuals
-- slide decks exported as PDF
-- documents with unusual fonts or rotations
-- large and malformed PDFs
-
-No PDF parser can guarantee correct handling of every file. Unsupported, malformed, encrypted, or unusually complex PDFs should produce structured warnings or partial results rather than silent failure.
-
-## Security model
-
-PDF processing can expose local files, download remote content, invoke OCR subprocesses, consume large amounts of memory, and parse hostile input.
-
-The redesigned server is expected to provide:
-
-- configurable allowed filesystem roots
-- optional denial of arbitrary absolute paths
-- PDF signature and size checks
-- download, redirect, and timeout limits
-- blocking for loopback, private, and link-local remote addresses
-- OCR and rendering timeouts
-- page, image, memory, and decompression limits
-- temporary-file cleanup
-- sanitized errors
-- no telemetry by default
-
-Review [`SECURITY.md`](SECURITY.md) before deploying the server in a shared or networked environment.
-
-## Privacy
-
-The project is local-first. The intended default is to process PDF content on the machine running the MCP server.
-
-Remote URLs require the server to download the file. Optional embedding providers, if enabled in the future, may receive extracted text according to their configuration and policies. Such integrations must be disabled by default and clearly documented.
-
-See [`docs/PRIVACY.md`](docs/PRIVACY.md).
-
-## Client compatibility
-
-The project intends to support multiple MCP-compatible clients, including coding assistants and desktop applications. Support will be claimed only after a client has passed the documented compatibility checks.
-
-See [`docs/CLIENT-COMPATIBILITY.md`](docs/CLIENT-COMPATIBILITY.md) for the verification matrix.
-
-## Benchmarking policy
-
-The project will not publish broad cost or quality claims without reproducible evidence.
-
-Every comparison should identify:
-
-- client and version
-- model and exact model identifier
-- provider and API path
-- PDF processing mode
-- visual and citation settings
-- PDF Decompiler MCP version and mode
-- token and response budgets
-- image resolution
-- cache state
-- hardware and operating system
-- number of repetitions
-
-Benchmarks should measure:
-
-- tool-result bytes and tokens
-- cold and warm latency
-- extraction and retrieval reliability
-- peak memory and cache use
-- text, table, and visual answer quality
-- retrieval precision and recall
-- citation correctness
-
-See [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
-
-## Repository structure target
-
-```text
-PDF-Decompiler-MCP/
-  src/
-    server/
-    tools/
-    extraction/
-    models/
-    retrieval/
-    ranking/
-    caching/
-    rendering/
-    ocr/
-    security/
-    clients/
-    utilities/
-  tests/
-    unit/
-    integration/
-    fixtures/
-    benchmarks/
-  docs/
-  examples/
-  scripts/
-  schemas/
-  .github/
-  README.md
-  CONTRIBUTING.md
-  SECURITY.md
-  SUPPORT.md
-  CODE_OF_CONDUCT.md
-  GOVERNANCE.md
-  CHANGELOG.md
-  MIGRATION.md
-  ROADMAP.md
-  LICENSE
-```
-
-## Roadmap
-
-The redesign is divided into three phases:
-
-1. Rebrand, normalize the repository, modularize extraction, and define the canonical document model.
-2. Add document handles, caching, selective retrieval, retrieval modes, citations, budgets, reliability controls, and security protections.
-3. Verify multiple clients, publish reproducible benchmarks, stabilize schemas, and prepare the first stable release.
-
-See [`ROADMAP.md`](ROADMAP.md) for completion criteria.
-
-## Migration
-
-Users of Lightweight PDF MCP for Claude AI should read [`MIGRATION.md`](MIGRATION.md) before changing repository URLs, MCP server keys, package names, entry points, or tool calls.
-
-## Contributing
-
-Contributions are welcome after the source tree is restored and the development workflow is documented.
-
-Before opening a pull request:
-
-1. Read [`CONTRIBUTING.md`](CONTRIBUTING.md).
-2. Add or update tests.
-3. Describe any schema, token, security, or compatibility impact.
-4. Avoid unsupported performance claims.
-5. Include reproducible fixtures or instructions for PDF-specific bugs when licensing permits.
-
-## Support and security
-
-- General questions and troubleshooting: [`SUPPORT.md`](SUPPORT.md)
-- Vulnerability reporting: [`SECURITY.md`](SECURITY.md)
-- Community expectations: [`CODE_OF_CONDUCT.md`](CODE_OF_CONDUCT.md)
-- Project decisions: [`GOVERNANCE.md`](GOVERNANCE.md)
+- [`docs/ARCHITECTURE.md`](docs/ARCHITECTURE.md)
+- [`docs/TOOLS.md`](docs/TOOLS.md)
+- [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md)
+- [`docs/PRIVACY.md`](docs/PRIVACY.md)
+- [`docs/CLIENT-COMPATIBILITY.md`](docs/CLIENT-COMPATIBILITY.md)
+- [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md)
+- [`SECURITY.md`](SECURITY.md)
+- [`MIGRATION.md`](MIGRATION.md)
+- [`CHANGELOG.md`](CHANGELOG.md)
+- [`CONTRIBUTING.md`](CONTRIBUTING.md)
+- [`SUPPORT.md`](SUPPORT.md)
+- [`ROADMAP.md`](ROADMAP.md)
 
 ## License
 
-PDF Decompiler MCP is licensed under the GNU Affero General Public License v3.0 only, unless the repository owner explicitly changes the license in a future commit.
-
-Keep the repository's exact `LICENSE` file as the legal source of truth. Ensure `package.json`, release artifacts, and documentation use the SPDX identifier `AGPL-3.0-only`.
-
-## Acknowledgment of the previous project
-
-PDF Decompiler MCP began as **Lightweight PDF MCP for Claude AI**. The original project explored local preprocessing of PDF text, tables, links, images, OCR output, and page fallbacks for Claude Desktop.
-
-The rebrand reflects what was learned from testing: more document fidelity can require more context, and efficiency should come from selective retrieval and explicit budgets rather than a universal lightweight claim.
+The repository declares `AGPL-3.0-only`. Publication and any statement that relicensing is complete remain blocked until the provenance review supports that conclusion. See [`LICENSE`](LICENSE), [`NOTICE`](NOTICE), and [`THIRD_PARTY_NOTICES.md`](THIRD_PARTY_NOTICES.md).
