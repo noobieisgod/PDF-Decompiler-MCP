@@ -1,4 +1,11 @@
-import { CAPTION_MAX_DIST } from '../config/constants.mjs';
+import {
+    CAPTION_MAX_DIST,
+    MIN_COLUMN_GUTTER_LINE_COUNT,
+    MIN_COLUMN_GUTTER_PAGE_HEIGHT_RATIO,
+    MIN_COLUMN_GUTTER_PT,
+    SPANNING_BLOCK_WIDTH_RATIO,
+} from '../config/constants.mjs';
+import { unionBBoxes } from '../model/geometry.mjs';
 
 export function getTextStats(items) {
     const joined = items.map(item => item.str).join(' ').trim();
@@ -37,7 +44,21 @@ function buildTextLines(items) {
     if (current.length > 0) {
         lines.push(current.sort((a, b) => a.x - b.x));
     }
-    return lines;
+    return lines.flatMap(line => {
+        const segments = [];
+        let segment = [];
+        for (const item of line) {
+            const previous = segment.at(-1);
+            const gap = previous ? item.x - (previous.x + (previous.w || 0)) : 0;
+            if (previous && gap >= MIN_COLUMN_GUTTER_PT) {
+                segments.push(segment);
+                segment = [];
+            }
+            segment.push(item);
+        }
+        if (segment.length) segments.push(segment);
+        return segments;
+    });
 }
 
 function classifyBlockRole(text) {
@@ -54,10 +75,46 @@ function classifyBlockRole(text) {
     return 'text';
 }
 
-export function buildTextBlocks(items) {
+function orderBlocks(blocks, viewport) {
+    const width = viewport?.width || 0;
+    const height = viewport?.height || 0;
+    const spanning = blocks.filter(block => block.role === 'heading' || (width > 0 && block.bbox?.width / width >= SPANNING_BLOCK_WIDTH_RATIO));
+    const candidates = blocks.filter(block => !spanning.includes(block) && block.bbox);
+    const starts = [...new Set(candidates.map(block => block.bbox.x))].sort((a, b) => a - b);
+    let split = null;
+    let largestGap = 0;
+    for (let index = 1; index < starts.length; index += 1) {
+        const gap = starts[index] - starts[index - 1];
+        if (gap > largestGap) {
+            largestGap = gap;
+            split = (starts[index] + starts[index - 1]) / 2;
+        }
+    }
+    const left = split === null ? [] : candidates.filter(block => block.bbox.x + block.bbox.width / 2 < split);
+    const right = split === null ? [] : candidates.filter(block => block.bbox.x + block.bbox.width / 2 >= split);
+    const coverage = values => values.length ? (Math.max(...values.map(block => block.bbox.y + block.bbox.height)) - Math.min(...values.map(block => block.bbox.y))) / Math.max(1, height) : 0;
+    const hasColumns = largestGap >= MIN_COLUMN_GUTTER_PT
+        && left.length >= MIN_COLUMN_GUTTER_LINE_COUNT
+        && right.length >= MIN_COLUMN_GUTTER_LINE_COUNT
+        && Math.max(coverage(left), coverage(right)) >= MIN_COLUMN_GUTTER_PAGE_HEIGHT_RATIO;
+    if (!hasColumns) {
+        const ordered = [...blocks].sort((a, b) => a.bbox?.y - b.bbox?.y || a.bbox?.x - b.bbox?.x || a.sourceIndex - b.sourceIndex);
+        const ambiguous = split !== null && largestGap >= MIN_COLUMN_GUTTER_PT && left.length && right.length;
+        return { blocks: ordered, warnings: ambiguous ? [{ code: 'layout_ambiguous' }] : [] };
+    }
+    const columnSort = values => [...values].sort((a, b) => a.bbox.y - b.bbox.y || a.bbox.x - b.bbox.x || a.sourceIndex - b.sourceIndex);
+    const firstColumnY = Math.min(...candidates.map(block => block.bbox.y));
+    const lastColumnY = Math.max(...candidates.map(block => block.bbox.y + block.bbox.height));
+    const before = columnSort(spanning.filter(block => block.bbox.y + block.bbox.height <= firstColumnY));
+    const after = columnSort(spanning.filter(block => block.bbox.y >= lastColumnY));
+    const middle = columnSort(spanning.filter(block => !before.includes(block) && !after.includes(block)));
+    return { blocks: [...before, ...columnSort(left), ...columnSort(right), ...middle, ...after], warnings: middle.length ? [{ code: 'layout_ambiguous' }] : [] };
+}
+
+export function buildTextBlocks(items, viewport = null) {
     const lines = buildTextLines(items);
     if (lines.length === 0) {
-        return [];
+        return { blocks: [], warnings: [] };
     }
     const blocks = [];
     let current = null;
@@ -66,11 +123,13 @@ export function buildTextBlocks(items) {
         if (!text) {
             continue;
         }
-        const yTop = Math.min(...lineItems.map(item => item.yTop));
-        const yBottom = Math.max(...lineItems.map(item => item.yTop + (item.h || 12)));
-        const x = Math.min(...lineItems.map(item => item.x));
+        const bbox = unionBBoxes(lineItems.map(item => item.bbox), viewport?.width, viewport?.height);
+        const yTop = bbox?.y ?? Math.min(...lineItems.map(item => item.yTop));
+        const yBottom = bbox ? bbox.y + bbox.height : Math.max(...lineItems.map(item => item.yTop + (item.h || 12)));
+        const x = bbox?.x ?? Math.min(...lineItems.map(item => item.x));
+        const sourceIndex = Math.min(...lineItems.map(item => items.indexOf(item)).filter(index => index >= 0));
         if (!current) {
-            current = { text, yTop, yBottom, x };
+            current = { text, yTop, yBottom, x, bboxes: [bbox], spans: [...lineItems], sourceIndex };
             continue;
         }
         const gap = yTop - current.yBottom;
@@ -79,21 +138,26 @@ export function buildTextBlocks(items) {
             current.text = `${current.text}\n${text}`;
             current.yBottom = yBottom;
             current.x = Math.min(current.x, x);
+            current.bboxes.push(bbox);
+            current.spans.push(...lineItems);
+            current.sourceIndex = Math.min(current.sourceIndex, sourceIndex);
         } else {
             blocks.push({
                 ...current,
+                bbox: unionBBoxes(current.bboxes, viewport?.width, viewport?.height),
                 role: classifyBlockRole(current.text),
             });
-            current = { text, yTop, yBottom, x };
+            current = { text, yTop, yBottom, x, bboxes: [bbox], spans: [...lineItems], sourceIndex };
         }
     }
     if (current) {
         blocks.push({
             ...current,
+            bbox: unionBBoxes(current.bboxes, viewport?.width, viewport?.height),
             role: classifyBlockRole(current.text),
         });
     }
-    return blocks;
+    return orderBlocks(blocks.map(({ bboxes, ...block }) => block), viewport);
 }
 
 export function normalizeLooseText(text) {

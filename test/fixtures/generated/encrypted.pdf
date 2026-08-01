@@ -1,0 +1,33 @@
+%PDF-1.7
+% synthetic licensing-safe fixture
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [3 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Contents 4 0 R >>
+endobj
+4 0 obj
+<< /Length 0 >>
+stream
+
+endstream
+endobj
+5 0 obj
+<< /Filter /Standard /V 1 /R 2 /Length 40 /O <00112233445566778899aabbccddeeff00112233445566778899aabbccddeeff> /U <ffeeddccbbaa99887766554433221100ffeeddccbbaa99887766554433221100> /P -4 >>
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000044 00000 n 
+0000000093 00000 n 
+0000000150 00000 n 
+0000000237 00000 n 
+0000000286 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R /Encrypt 5 0 R /ID [<0123456789abcdef0123456789abcdef><0123456789abcdef0123456789abcdef>] >>
+startxref
+492
+%%EOF

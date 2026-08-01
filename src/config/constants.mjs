@@ -46,6 +46,17 @@ export const MIN_OPAQUE_PIXEL_RATIO = Number(process.env.PDF_MIN_OPAQUE_PIXEL_RA
 export const JPEG_OUTPUT_QUALITY = Number(process.env.PDF_JPEG_OUTPUT_QUALITY ?? 0.75);
 export const MIN_ENCODED_BYTES_FOR_CROP = Number(process.env.PDF_MIN_ENCODED_BYTES_FOR_CROP ?? process.env.PDF_MIN_PNG_BYTES_FOR_CROP ?? 700);
 export const MIN_ENCODED_BYTES_FOR_PAGE = Number(process.env.PDF_MIN_ENCODED_BYTES_FOR_PAGE ?? process.env.PDF_MIN_PNG_BYTES_FOR_PAGE ?? 2500);
+// Internal layout heuristics. They are intentionally tunable and are not public schema contracts.
+export const MIN_COLUMN_GUTTER_PT = Number(process.env.PDF_MIN_COLUMN_GUTTER_PT ?? 18);
+export const MIN_COLUMN_GUTTER_LINE_COUNT = Number(process.env.PDF_MIN_COLUMN_GUTTER_LINE_COUNT ?? 3);
+export const MIN_COLUMN_GUTTER_PAGE_HEIGHT_RATIO = Number(process.env.PDF_MIN_COLUMN_GUTTER_PAGE_HEIGHT_RATIO ?? 0.25);
+export const SPANNING_BLOCK_WIDTH_RATIO = Number(process.env.PDF_SPANNING_BLOCK_WIDTH_RATIO ?? 0.70);
+export const LINK_ANCHOR_MIN_SPAN_OVERLAP_RATIO = Number(process.env.PDF_LINK_ANCHOR_MIN_SPAN_OVERLAP_RATIO ?? 0.50);
+export const LINK_ANCHOR_BOUNDARY_EPSILON_PT = Number(process.env.PDF_LINK_ANCHOR_BOUNDARY_EPSILON_PT ?? 0.25);
+export const LINK_ANCHOR_MAX_SAME_LINE_GAP_PT = Number(process.env.PDF_LINK_ANCHOR_MAX_SAME_LINE_GAP_PT ?? 4);
+export const LINK_ANCHOR_MAX_COMPONENT_SCORE_DELTA = Number(process.env.PDF_LINK_ANCHOR_MAX_COMPONENT_SCORE_DELTA ?? 0.10);
+export const VECTOR_MIXED_REGION_RATIO = Number(process.env.PDF_VECTOR_MIXED_REGION_RATIO ?? 0.01);
+export const VECTOR_MIXED_AGGREGATE_RATIO = Number(process.env.PDF_VECTOR_MIXED_AGGREGATE_RATIO ?? 0.02);
 
 export function debugTiming(...parts) {
     if (!DEBUG_TIMING) {

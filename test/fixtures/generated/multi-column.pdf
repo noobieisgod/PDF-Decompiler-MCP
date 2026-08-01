@@ -1,0 +1,50 @@
+%PDF-1.7
+% synthetic licensing-safe fixture
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Rotate 0 /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 946 >>
+stream
+BT /F1 18 Tf 72 730 Td (LAYOUT HEADING) Tj ET
+BT /F1 12 Tf 72 680 Td (Left column alpha) Tj ET
+BT /F1 12 Tf 330 680 Td (Right column one) Tj ET
+BT /F1 12 Tf 72 650 Td (Left column beta) Tj ET
+BT /F1 12 Tf 330 650 Td (Right column two) Tj ET
+BT /F1 12 Tf 72 620 Td (Left column gamma) Tj ET
+BT /F1 12 Tf 330 620 Td (Right column three) Tj ET
+BT /F1 12 Tf 72 590 Td (Left column delta) Tj ET
+BT /F1 12 Tf 330 590 Td (Right column four) Tj ET
+BT /F1 12 Tf 72 560 Td (Left column epsilon) Tj ET
+BT /F1 12 Tf 330 560 Td (Right column five) Tj ET
+BT /F1 12 Tf 72 530 Td (Left column zeta) Tj ET
+BT /F1 12 Tf 330 530 Td (Right column six) Tj ET
+BT /F1 12 Tf 72 500 Td (Left column eta) Tj ET
+BT /F1 12 Tf 330 500 Td (Right column seven) Tj ET
+BT /F1 12 Tf 72 470 Td (Left column theta) Tj ET
+BT /F1 12 Tf 330 470 Td (Right column eight) Tj ET
+BT /F1 13 Tf 72 430 Td (Spanning footer across both columns with deterministic text reaching far margin) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000044 00000 n 
+0000000093 00000 n 
+0000000150 00000 n 
+0000000220 00000 n 
+0000000356 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1353
+%%EOF

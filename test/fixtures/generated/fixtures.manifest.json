@@ -1,0 +1,1163 @@
+{
+  "version": 2,
+  "generator": "test/fixtures/generate-fixtures.mjs",
+  "ownership": "Project-generated synthetic content",
+  "license": "CC0-1.0",
+  "fixtures": {
+    "annotations.pdf": {
+      "sha256": "b0e4f1e8fb59aa1be6ed4993256bea10a44112b00368d4a5c90b6ca531ddee8a",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "annotations",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block",
+          "annotation"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "annotationSubtypes": [
+          "Text",
+          "Highlight",
+          "FreeText",
+          "Underline"
+        ],
+        "annotationCount": 5
+      }
+    },
+    "blank.pdf": {
+      "sha256": "bcec0241c05905c7823520fa1fa1e364e3d55e4d20aa0dcd4b6d820a49e0a541",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "blank",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "blank"
+        ],
+        "visualTypes": [
+          "none"
+        ],
+        "elementTypes": [],
+        "boundingBoxesRequired": false,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "encrypted.pdf": {
+      "sha256": "768e349424543d66440c20cd835fe136c316cf23e39db24dd5165fdbfc9e2396",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "encrypted",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [],
+        "visualTypes": [],
+        "elementTypes": [],
+        "boundingBoxesRequired": false,
+        "warnings": [],
+        "errorCode": "PDF_PASSWORD_REQUIRED"
+      }
+    },
+    "image-only.pdf": {
+      "sha256": "d5792f57112d30420dc70298a3bd42273ee1a88662414fe72074e552e05c9f09",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "image only",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "scan_like",
+          "ocr_text"
+        ],
+        "visualTypes": [
+          "raster"
+        ],
+        "elementTypes": [
+          "figure",
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "ocr_unavailable_or_rejected"
+        ],
+        "errorCode": null,
+        "ocrText": null
+      }
+    },
+    "invalid-signature.pdf": {
+      "sha256": "07bcbca5e5cff5eadb6a3578850bb9413f9bfd2406d9210b0c25b7f78449889a",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "invalid signature",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [],
+        "visualTypes": [],
+        "elementTypes": [],
+        "boundingBoxesRequired": false,
+        "warnings": [],
+        "errorCode": "PDF_INVALID_SIGNATURE"
+      }
+    },
+    "invalid-xref.pdf": {
+      "sha256": "77f8f2863645ec8d0d696dce89c6461fe947ba5486db6546b14e3a6557221b9e",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "invalid xref",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [],
+        "visualTypes": [],
+        "elementTypes": [],
+        "boundingBoxesRequired": false,
+        "warnings": [],
+        "errorCode": "PDF_INVALID_XREF"
+      }
+    },
+    "layout-ambiguous.pdf": {
+      "sha256": "85d3f27ae084f8b8536e25ebdd70a5e23c19c5559004aa384e32cd82f2e2c696",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "layout ambiguous",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "layout_ambiguous"
+        ],
+        "errorCode": null
+      }
+    },
+    "layout-code.pdf": {
+      "sha256": "054eac44a5be3e33075c39e43a782fba9714f6883da46c0828c79131a17cc56e",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "layout code",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "layout-sidebar.pdf": {
+      "sha256": "a6557c6d7beda4618b8b06ea6c602755290a0a14454c7b75a977b6f1f982ba0c",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "layout sidebar",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "links-annotations.pdf": {
+      "sha256": "d01d47aab2b6bd0501c5af1890d8c47d5920de7e51fd2e224e4bc6d3a8aa0ad5",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "links annotations",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block",
+          "link"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "incomplete_or_ambiguous_links_when_present"
+        ],
+        "errorCode": null,
+        "linkTargets": [
+          "adjacent",
+          "overlapping",
+          "multiline"
+        ]
+      }
+    },
+    "links-overlap.pdf": {
+      "sha256": "a138df5757bb85071a92f52c9c4b96920dc277a895d0de5f43801edb4782560d",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "links overlap",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block",
+          "link"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "incomplete_or_ambiguous_links_when_present"
+        ],
+        "errorCode": null,
+        "linkTargets": [
+          "adjacent",
+          "overlapping",
+          "multiline"
+        ]
+      }
+    },
+    "links.pdf": {
+      "sha256": "d01d47aab2b6bd0501c5af1890d8c47d5920de7e51fd2e224e4bc6d3a8aa0ad5",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "links",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block",
+          "link"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "incomplete_or_ambiguous_links_when_present"
+        ],
+        "errorCode": null,
+        "linkTargets": [
+          "external_url",
+          "named_destination",
+          "explicit_destination",
+          "target_only"
+        ]
+      }
+    },
+    "malformed.pdf": {
+      "sha256": "204b36e5b8f7878e59a48290f370d3ec6b280784d389ceb9b5d55d4b5884ec00",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "malformed",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [],
+        "visualTypes": [],
+        "elementTypes": [],
+        "boundingBoxesRequired": false,
+        "warnings": [],
+        "errorCode": "PDF_MALFORMED_UNKNOWN"
+      }
+    },
+    "missing-startxref.pdf": {
+      "sha256": "ada6082290e97e80bf4d4fbbd29283966d0d864ca53291a3ba02103cb7446600",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "missing startxref",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [],
+        "visualTypes": [],
+        "elementTypes": [],
+        "boundingBoxesRequired": false,
+        "warnings": [],
+        "errorCode": "PDF_INVALID_STARTXREF"
+      }
+    },
+    "mixed-raster-vector.pdf": {
+      "sha256": "6a5d7546e0f6abf6be6969d4852329267a37ca86e0ab5f55c642ed339dddb992",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "mixed raster vector",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual",
+          "text"
+        ],
+        "visualTypes": [
+          "raster",
+          "mixed"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "mixed-text-raster.pdf": {
+      "sha256": "12785cc47c24b811b886700f58b81abc7afd421eff1ac715f3d79b13834a32be",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "mixed text raster",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual",
+          "text"
+        ],
+        "visualTypes": [
+          "raster",
+          "mixed"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "mixed-text-vector.pdf": {
+      "sha256": "9736c61be35e6c15dbfe642e7328ab6f389f8cf452c6b4dc43281eaaff73222b",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "mixed text vector",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "multi-column.pdf": {
+      "sha256": "6e97bd63f5ec1d2eecbfd190edb3b6b47b9a574c874b62411668edf267fc1f3d",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "multi column",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "readingOrder": [
+          "LAYOUT HEADING",
+          "Left column",
+          "Right column",
+          "Spanning footer"
+        ]
+      }
+    },
+    "narrow-layout.pdf": {
+      "sha256": "33324a41c12d03e9a47c8f9829f0c0782d30ed6c1ee455f1d9ee5c850e7d27d8",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "narrow layout",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "oversized-content.pdf": {
+      "sha256": "3504355d2e0973560d66a44836ab4b31adefa6570fe3071e6b1263a2406f0a9a",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "oversized content",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "photograph-proxy.pdf": {
+      "sha256": "87debee5c332e3a2c999c9ff6f6f7e8a10a12c9568f7a7c294c6ba9983685bae",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "photograph proxy",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual",
+          "text"
+        ],
+        "visualTypes": [
+          "raster",
+          "mixed"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "raster-photograph.pdf": {
+      "sha256": "87debee5c332e3a2c999c9ff6f6f7e8a10a12c9568f7a7c294c6ba9983685bae",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "raster photograph",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual",
+          "text"
+        ],
+        "visualTypes": [
+          "raster",
+          "mixed"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "bboxSamples": [
+          {
+            "type": "figure",
+            "x": 90,
+            "y": 212,
+            "width": 430,
+            "height": 300
+          }
+        ]
+      }
+    },
+    "repeated-graphics.pdf": {
+      "sha256": "34ab0a608fbd98a6e3ef6ac229303d66f982911fd4a93588d37753602ca0f652",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "repeated graphics",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual",
+          "text"
+        ],
+        "visualTypes": [
+          "raster",
+          "mixed"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "repeated-images.pdf": {
+      "sha256": "f67191b340cb01c61f9a0416b4a25cebeca015896aaaa993458cf0d5ef6342be",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "repeated images",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual",
+          "text"
+        ],
+        "visualTypes": [
+          "raster",
+          "mixed"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "rotated.pdf": {
+      "sha256": "f3f84985078a7f350d3b21dd2a97d0e7bdd72dafa9081d7ff4df268068342a6f",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "rotated",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "rotations": [
+          90,
+          270
+        ]
+      }
+    },
+    "scan-readable.pdf": {
+      "sha256": "cd5ec21d09a97301f16b13c7a9ee0111ef72cde5de1105b4a84a35e3e4a4fc87",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "scan readable",
+      "ocrRequired": true,
+      "expected": {
+        "pageClassifications": [
+          "scan_like",
+          "ocr_text"
+        ],
+        "visualTypes": [
+          "raster"
+        ],
+        "elementTypes": [
+          "figure",
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "ocr_unavailable_or_rejected"
+        ],
+        "errorCode": null,
+        "ocrText": "OCR SUCCESS TEXT"
+      }
+    },
+    "scan-unreadable.pdf": {
+      "sha256": "1af54ea4745ce7c9a021d3fe6901eff85a970c590f87587ed4410a8071e45c6a",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "scan unreadable",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "scan_like",
+          "ocr_text"
+        ],
+        "visualTypes": [
+          "raster"
+        ],
+        "elementTypes": [
+          "figure",
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "ocr_unavailable_or_rejected"
+        ],
+        "errorCode": null,
+        "ocrText": null
+      }
+    },
+    "scanned-proxy.pdf": {
+      "sha256": "cd5ec21d09a97301f16b13c7a9ee0111ef72cde5de1105b4a84a35e3e4a4fc87",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "scanned proxy",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "scan_like",
+          "ocr_text"
+        ],
+        "visualTypes": [
+          "raster"
+        ],
+        "elementTypes": [
+          "figure",
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "ocr_unavailable_or_rejected"
+        ],
+        "errorCode": null,
+        "ocrText": null
+      }
+    },
+    "table-merged-header.pdf": {
+      "sha256": "3bf7f869e3b4a43c7914e69c58aeb94a0d28d71dea511086d060350cd5b3da12",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "table merged header",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "table"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "table"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "tableShape": {
+          "rows": 3,
+          "columns": 3
+        }
+      }
+    },
+    "table-negative-controls.pdf": {
+      "sha256": "f6cd3fb4bb4783c85ac658abc4bead7e6ff23628b71c16de5f7805de0d52aca6",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "table negative controls",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "tableShape": null
+      }
+    },
+    "tables-bordered.pdf": {
+      "sha256": "33a0c41550053856ee62e541bf76ffe923ff2339834c488eba61c6dac7465f4c",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "tables bordered",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "table"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "table"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "tableShape": {
+          "rows": 3,
+          "columns": 3
+        }
+      }
+    },
+    "tables-borderless.pdf": {
+      "sha256": "fe76be3e71aeb30075f9da9ab4b934205e2e92b2f7933394e3a0216beb86b095",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "tables borderless",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "table"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "table"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "tableShape": {
+          "rows": 3,
+          "columns": 3
+        }
+      }
+    },
+    "tables.pdf": {
+      "sha256": "33a0c41550053856ee62e541bf76ffe923ff2339834c488eba61c6dac7465f4c",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "tables",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "table"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "table"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "tableShape": {
+          "rows": 3,
+          "columns": 3
+        }
+      }
+    },
+    "text-layout.pdf": {
+      "sha256": "0f8fa3c49e2e955b10adc1957f9009be654c41d45e2b94c184a0871bf0d4d090",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "text layout",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "bboxSamples": [
+          {
+            "type": "block",
+            "text": "LAYOUT HEADING",
+            "x": 72,
+            "y": 44,
+            "width": 159.03,
+            "height": 18
+          }
+        ]
+      }
+    },
+    "text.pdf": {
+      "sha256": "d3962e52054ef192079997258cabfcee181977aa954196bfe48a13eb03a3ac72",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "text",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
+    "truncated.pdf": {
+      "sha256": "6800d0c1125336545bbce8d1128302e63e6ce6ba17e944e284710ae364ec4621",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "truncated",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [],
+        "visualTypes": [],
+        "elementTypes": [],
+        "boundingBoxesRequired": false,
+        "warnings": [],
+        "errorCode": "PDF_TRUNCATED"
+      }
+    },
+    "vector-clipping.pdf": {
+      "sha256": "7e6c0168d4e51e66f04d45cf22f84fc379fa17cff34c7fc69da48e3efd539876",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "vector clipping",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual"
+        ],
+        "visualTypes": [
+          "vector"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "visual_bounds_may_be_approximate"
+        ],
+        "errorCode": null
+      }
+    },
+    "vector-diagram.pdf": {
+      "sha256": "6ab44c36619961543d61e9e47744550352e13fc87ab7fc859ad94e99154274b6",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "vector diagram",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual"
+        ],
+        "visualTypes": [
+          "vector"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "visual_bounds_may_be_approximate"
+        ],
+        "errorCode": null
+      }
+    },
+    "vector-transformed.pdf": {
+      "sha256": "5362446bded008fa121e07aaa8f72a2d7f368b1f2bc4db61140bc4e14105ff6e",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "vector transformed",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual"
+        ],
+        "visualTypes": [
+          "vector"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "visual_bounds_may_be_approximate"
+        ],
+        "errorCode": null
+      }
+    },
+    "vector-unsupported.pdf": {
+      "sha256": "da978795b41fbe038d543e9e6938af0a3a1e1190ccbd1f1077b234cc04f86f76",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "vector unsupported",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "visual"
+        ],
+        "visualTypes": [
+          "unknown"
+        ],
+        "elementTypes": [
+          "figure"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [
+          "visual_unknown"
+        ],
+        "errorCode": null
+      }
+    },
+    "wide-layout.pdf": {
+      "sha256": "248edd170b701f588d233f99cfb27cbc37ab7a3d9cf3e39694ae72da619ae604",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "wide layout",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    }
+  },
+  "localOnlyExcluded": [
+    "Heavy Test One.pdf",
+    "Medium Test One.pdf",
+    "Medium Test Two.pdf"
+  ]
+}

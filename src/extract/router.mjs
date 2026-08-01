@@ -34,11 +34,11 @@ function getImageCoverage(placements, viewport) {
     return Math.min(1, covered / pageArea);
 }
 
-export function buildPageProfile(pageNum, bodyItems, textBlocks, imagePlacements, viewport, annotations, strippedByBoilerplate) {
+export function buildPageProfile(pageNum, bodyItems, textBlocks, imagePlacements, viewport, annotations, strippedByBoilerplate, operatorSignals = null) {
     const joined = bodyItems.map(item => item.str).join(' ').trim();
     const wordCount = joined ? joined.split(/\s+/).length : 0;
     const textChars = joined.length;
-    const imageCoverage = getImageCoverage(imagePlacements, viewport);
+    const imageCoverage = operatorSignals?.rasterCoverage?.value ?? getImageCoverage(imagePlacements, viewport);
     const pageArea = Math.max(1, viewport.width * viewport.height);
     const largestImageCoverage = imagePlacements.size
         ? Math.max(...[...imagePlacements.values()].map(placement => (Math.max(1, placement.w) * Math.max(1, placement.h)) / pageArea))
@@ -49,6 +49,13 @@ export function buildPageProfile(pageNum, bodyItems, textBlocks, imagePlacements
     const normalizedBlocks = (textBlocks ?? [])
         .map(block => normalizeLooseText(block.text))
         .filter(Boolean);
+    const hasRaster = imagePlacements.size > 0;
+    const hasKnownVector = (operatorSignals?.vectorPaintCount ?? 0) > 0 && operatorSignals?.vectorCoverage?.value !== null;
+    const hasUncertainVector = Boolean(operatorSignals?.uncertain) || ((operatorSignals?.vectorPaintCount ?? 0) > 0 && operatorSignals?.vectorCoverage?.value === null);
+    const visualType = hasRaster && (hasKnownVector || hasUncertainVector) ? 'mixed'
+        : hasRaster ? 'raster'
+            : hasKnownVector ? 'vector'
+                : hasUncertainVector ? 'unknown' : 'none';
     return {
         page: pageNum,
         wordCount,
@@ -58,7 +65,9 @@ export function buildPageProfile(pageNum, bodyItems, textBlocks, imagePlacements
         largestImageCoverage,
         tableLikelihood,
         dominantRole,
-        contentClassHint: dominantRole === 'list'
+        contentClassHint: wordCount === 0 && (hasKnownVector || hasUncertainVector)
+            ? 'visual'
+            : dominantRole === 'list'
             ? 'structured_text'
             : imageCoverage >= 0.25
                 && largestImageCoverage >= 0.15
@@ -76,6 +85,18 @@ export function buildPageProfile(pageNum, bodyItems, textBlocks, imagePlacements
         strippedByBoilerplate,
         viewportWidth: viewport.width,
         viewportHeight: viewport.height,
+        rotation: viewport.rotation || 0,
+        visualType,
+        visualSignals: {
+            hasText: wordCount > 0,
+            rasterCount: imagePlacements.size,
+            rasterCoverage: operatorSignals?.rasterCoverage || { value: imageCoverage, precision: 'approximate' },
+            vectorPaintCount: operatorSignals?.vectorPaintCount ?? 0,
+            vectorCoverage: operatorSignals?.vectorCoverage || { value: 0, precision: 'exact' },
+            annotationCount: annotations?.length ?? 0,
+            warnings: operatorSignals?.warnings || [],
+        },
+        visualInspectionUncertain: hasUncertainVector,
     };
 }
 
@@ -96,6 +117,14 @@ export function decidePageRouting(profile) {
             filteredReason: null,
         };
     }
+    if (profile.wordCount === 0 && profile.visualType === 'unknown') {
+        return {
+            extractionMode: 'visual_fallback',
+            routingMode: 'page_visual_unknown',
+            contentClass: 'visual',
+            filteredReason: null,
+        };
+    }
     if (profile.contentClassHint === 'visual'
         || (profile.imageCoverage >= ROUTE_VISUAL_IMAGE_COVERAGE
             && profile.largestImageCoverage >= 0.15
@@ -103,6 +132,14 @@ export function decidePageRouting(profile) {
             && profile.wordCount <= OCR_MAX_NATIVE_WORDS
             && profile.textDensity < ROUTE_TEXT_DENSITY
             && profile.dominantRole !== 'list')) {
+        if (profile.visualType === 'raster' || profile.visualType === 'mixed') {
+            return {
+                extractionMode: 'native',
+                routingMode: 'native_visual_regions',
+                contentClass: 'visual',
+                filteredReason: null,
+            };
+        }
         return {
             extractionMode: 'visual_fallback',
             routingMode: 'page_visual_fallback',

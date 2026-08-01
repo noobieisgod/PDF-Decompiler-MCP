@@ -5,12 +5,13 @@
 - The project metadata and manifest use `AGPL-3.0-only`.
 - MuPDF 1.27.0 declares `AGPL-3.0-or-later`, which is compatible with an AGPL distribution but creates Corresponding Source obligations for bundled native or WASM code.
 - PDF.js and the optional model family declare Apache-2.0. MCP, Zod, and canvas packages declare permissive licenses.
-- Generated fixture source is original programmatic text and vector content under CC0-1.0.
+- Generated fixture source is original programmatic text, geometry, vector content, raster patterns, malformed structures, and deterministic security dictionaries under CC0-1.0.
+- The readable OCR raster is rendered with the pinned `LiberationSans-Regular.ttf` distributed in `pdfjs-dist` under its included Liberation font license. The generator records hashes and expected behavior, and package allowlists exclude all test PDFs.
 - `npm run license:check` reads every installed package license. `npm run package:verify` generates an SPDX 2.3 SBOM from the isolated production stage.
 
 ## Material reviewed
 
-The migration inventory identifies original repository archives, PDFs, and source trees. The 3.0.0 implementation reuses the repository owner's extraction source and adapts official package APIs. No third-party document text is copied into generated fixtures. Package inspection excludes tests, release archives, and development-only tooling.
+The migration inventory identifies original repository archives, PDFs, and source trees. The 3.0.0 implementation reuses the repository owner's extraction source and adapts official package APIs. No third-party document text is copied into generated fixtures. The three ignored local reports are validation inputs only and are excluded from Git and package allowlists. Package inspection excludes tests, release archives, and development-only tooling.
 
 ## Release-blocking attestations
 

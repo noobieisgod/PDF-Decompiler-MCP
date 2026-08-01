@@ -10,7 +10,7 @@ import { buildTextBlocks, findCaptionForImage } from './text.mjs';
 function buildRuntimeRenderNotice(kind) {
     return `(${kind} unavailable in the current runtime)`;
 }
-export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight, rawItems, mcidMap, renderPageCanvas: renderPageCanvasOverride }, hfPositions, maxImageDim, options = {}) {
+export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight, rawItems, mcidMap, resolveDestination, renderPageCanvas: renderPageCanvasOverride }, hfPositions, maxImageDim, options = {}) {
     const {
         allowImageRendering = true,
         allowOcr = true,
@@ -25,12 +25,14 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
     const strippedByBoilerplate = rawItems.length ? (rawItems.length - bodyItems.length) / rawItems.length : 0;
     const renderFullPageCanvas = async () => renderPageCanvasOverride ? renderPageCanvasOverride() : renderPageCanvas(pdfjsPage, viewport);
 
-    const [imagePlacements, annotations] = await Promise.all([
-        getImagePlacements(pdfjsPage, pageHeight),
-        getPageAnnotations(pdfjsPage, pageHeight),
+    const [visualInspection, annotationResult] = await Promise.all([
+        getImagePlacements(pdfjsPage, viewport),
+        getPageAnnotations(pdfjsPage, viewport, resolveDestination),
     ]);
-    const textBlocks = buildTextBlocks(bodyItems);
-    const pageProfile = buildPageProfile(pageNum, bodyItems, textBlocks, imagePlacements, viewport, annotations, strippedByBoilerplate);
+    const imagePlacements = visualInspection.placements;
+    const annotations = annotationResult.annotations.map(annotation => ({ ...annotation, page: pageNum }));
+    const initialLayout = buildTextBlocks(bodyItems, viewport);
+    const pageProfile = buildPageProfile(pageNum, bodyItems, initialLayout.blocks, imagePlacements, viewport, [...annotations, ...annotationResult.links], strippedByBoilerplate, visualInspection.visualSignals);
     const routing = decidePageRouting(pageProfile);
     let extractionMode = routing.extractionMode;
     let routingMode = routing.routingMode;
@@ -42,6 +44,9 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
     let rawTables = [];
     let rawLinks = [];
     let pageText = '';
+    let rawTextBlocks = [];
+    const extractionWarnings = [...annotationResult.warnings, ...initialLayout.warnings];
+    if (pageProfile.visualType === 'unknown') extractionWarnings.push({ code: 'visual_unknown' });
     let ocrAttempted = false;
     let ocrAccepted = false;
     let ocrReason = null;
@@ -68,13 +73,19 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                 cachedFullCanvas = await renderFullPageCanvas();
                 const ocrCanvas = scaleCanvas(cachedFullCanvas, Math.min(maxImageDim ?? 1400, 1400));
                 const ocrPng = await ocrCanvas.encode('png');
-                const ocrResult = await runTesseractOcr(Buffer.from(ocrPng), pageNum);
+                const ocrResult = await runTesseractOcr(Buffer.from(ocrPng), pageNum, {
+                    pixelWidth: ocrCanvas.width,
+                    pixelHeight: ocrCanvas.height,
+                    pageWidth: viewport.width,
+                    pageHeight: viewport.height,
+                });
                 if (ocrResult.ok) {
                     extractionMode = 'ocr';
                     routingMode = 'page_ocr';
                     contentClass = 'ocr_text';
                     ocrAccepted = true;
                     pageText = ocrResult.text;
+                    rawTextBlocks = ocrResult.blocks || [];
                 } else {
                     extractionMode = 'visual_fallback';
                     routingMode = 'page_visual_fallback';
@@ -88,7 +99,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                 const classified = classifyRenderFailure(err);
                 ocrReason = classified.knownRuntimeIssue
                     ? `${classified.userMessage}; OCR could not render the page`
-                    : classified.message;
+                    : classified.userMessage;
             }
         }
     }
@@ -155,11 +166,11 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                 }
             } catch (err) {
                 const classified = classifyRenderFailure(err);
-                fallbackReason = `${fallbackReason}; visual fallback error: ${classified.message}`;
+                fallbackReason = `${fallbackReason}; visual fallback error: ${classified.userMessage}`;
                 if (classified.knownRuntimeIssue || isKnownRenderEnvironmentError(err)) {
                     pageText = buildRuntimeRenderNotice('Visual fallback');
                 } else {
-                    pageText = `(Visual fallback failed: ${classified.message})`;
+                    pageText = `(Visual fallback failed: ${classified.userMessage})`;
                 }
             }
         }
@@ -178,10 +189,14 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
             ({ tables, nonTableItems } = detectTables(bodyItems));
         }
         const normalizedTables = tables.map(table => ({ ...table, rows: normalizeTableRows(table.rows) }));
+        if (contentClass === 'table' && normalizedTables.length === 0) contentClass = pageProfile.dominantRole === 'list' ? 'structured_text' : 'text';
+        const nativeLayout = buildTextBlocks(nonTableItems, viewport);
+        rawTextBlocks = nativeLayout.blocks;
+        extractionWarnings.push(...nativeLayout.warnings);
         const imagePlans = new Map();
         const activePlacements = new Map();
         for (const [name, placement] of imagePlacements.entries()) {
-            const caption = findCaptionForImage(placement, textBlocks);
+            const caption = findCaptionForImage(placement, initialLayout.blocks);
             const regionKind = classifyRegionKind(placement, caption, pageProfile);
             activePlacements.set(name, placement);
             imagePlans.set(name, {
@@ -237,8 +252,9 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                     });
             }
         }
-        const { linkMarkerMap, links } = anchorLinkAnnotations(nonTableItems, annotations);
+        const { linkMarkerMap, links, warnings: linkWarnings } = anchorLinkAnnotations(nonTableItems, annotationResult.links);
         rawLinks = links;
+        extractionWarnings.push(...linkWarnings);
         const tableIds = new Map();
         let localTableIdx = 0;
         rawTables = [];
@@ -246,7 +262,8 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
             tableIds.set(idx, `TBL_LOCAL_${localTableIdx++}`);
             rawTables.push({
                 rows: normalizedTables[idx].rows,
-                bbox: {
+                cells: normalizedTables[idx].cells || null,
+                bbox: normalizedTables[idx].bbox || {
                     x: 0,
                     y: normalizedTables[idx].yTop,
                     width: viewport.width,
@@ -255,6 +272,10 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
             });
         }
         pageText = buildPageTextWithLinks(nonTableItems, activePlacements, normalizedTables, imageIds, tableIds, linkMarkerMap);
+    } else {
+        const { links, warnings: linkWarnings } = anchorLinkAnnotations(bodyItems, annotationResult.links);
+        rawLinks = links;
+        extractionWarnings.push(...linkWarnings);
     }
 
     pdfjsPage.cleanup();
@@ -269,7 +290,10 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
         ocrAccepted,
         ocrReason,
         text: pageText,
+        textBlocks: rawTextBlocks,
         annotations,
+        annotationWidgetCount: annotationResult.widgetCount,
+        warnings: extractionWarnings,
         pageProfile,
         rawImages,
         rawTables,
@@ -278,7 +302,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
     };
 }
 
-export function buildPageErrorResult(pageData, err) {
+export function buildPageErrorResult(pageData) {
     try {
         pageData.pdfjsPage.cleanup();
     } catch {
@@ -288,13 +312,16 @@ export function buildPageErrorResult(pageData, err) {
         extractionMode: 'error',
         routingMode: 'page_error',
         contentClass: 'error',
-        fallbackReason: err?.message ?? String(err),
+        fallbackReason: 'Page extraction failed',
         filteredReason: null,
         ocrAttempted: false,
         ocrAccepted: false,
         ocrReason: null,
-        text: `(Page extraction failed: ${err?.message ?? err})`,
+        text: '(Page extraction failed)',
+        textBlocks: [],
         annotations: [],
+        annotationWidgetCount: 0,
+        warnings: [{ code: 'page_extraction_failed' }],
         pageProfile: {
             page: pageData.pageNum,
             wordCount: pageData.rawItems?.length ?? 0,
@@ -307,6 +334,17 @@ export function buildPageErrorResult(pageData, err) {
             annotationsCount: 0,
             viewportWidth: pageData.viewport?.width ?? 0,
             viewportHeight: pageData.viewport?.height ?? 0,
+            rotation: pageData.viewport?.rotation ?? 0,
+            visualType: 'unknown',
+            visualSignals: {
+                hasText: false,
+                rasterCount: 0,
+                rasterCoverage: { value: null, precision: 'unknown' },
+                vectorPaintCount: null,
+                vectorCoverage: { value: null, precision: 'unknown' },
+                annotationCount: 0,
+                warnings: ['page_extraction_failed'],
+            },
         },
         rawImages: [],
         rawTables: [],

@@ -14,6 +14,7 @@ import {
     OPS,
     patchCanvasContext,
 } from '../pdf/pdfjs-runtime.mjs';
+import { bboxFromPoints, multiplyTransform, normalizeBBox, transformPoint, transformUnitRect, unionBBoxes } from '../model/geometry.mjs';
 
 const KNOWN_RENDER_ENVIRONMENT_PATTERNS = [
     "Cannot read properties of undefined (reading 'createElement')",
@@ -38,7 +39,7 @@ export function classifyRenderFailure(err) {
     return {
         knownRuntimeIssue: false,
         message,
-        userMessage: message,
+        userMessage: 'Image rendering failed',
     };
 }
 
@@ -533,6 +534,7 @@ export function hashMatchScore(a, b) {
 }
 
 export async function renderPageImages(pdfjsPage, viewport, placements, imagePlans, maxImageDim, context = {}, options = {}) {
+    const { renderPageCanvasOverride = null } = options;
     const result = new Map();
     if (placements.size === 0) {
         return result;
@@ -760,46 +762,149 @@ export async function encodePageImage(canvas, context = {}) {
     return encodeCanvasWithDiagnostics(canvas, 'page', context, 'png');
 }
 
-export async function getImagePlacements(pdfjsPage, pageHeight) {
+export async function getImagePlacements(pdfjsPage, viewport) {
     const placements = new Map();
     let ops;
     try {
         ops = await pdfjsPage.getOperatorList();
     } catch {
-        return placements;
+        return {
+            placements,
+            visualSignals: {
+                rasterCount: 0,
+                rasterCoverage: { value: 0, precision: 'exact' },
+                vectorPaintCount: null,
+                vectorCoverage: { value: null, precision: 'unknown' },
+                vectorBounds: [],
+                uncertain: true,
+                warnings: ['operator_list_unavailable'],
+            },
+        };
     }
     const stack = [];
     let ctm = [1, 0, 0, 1, 0, 0];
-    const mul = (a, b) => [
-        a[0] * b[0] + a[2] * b[1], a[1] * b[0] + a[3] * b[1],
-        a[0] * b[2] + a[2] * b[3], a[1] * b[2] + a[3] * b[3],
-        a[0] * b[4] + a[2] * b[5] + a[4],
-        a[1] * b[4] + a[3] * b[5] + a[5],
-    ];
+    let fillColor = null;
+    let pathBounds = null;
+    let pathUncertain = false;
+    const vectorBounds = [];
+    let vectorPaintCount = 0;
+    let uncertain = false;
+    const warnings = [];
+    const pageArea = Math.max(1, viewport.width * viewport.height);
+    const paintOps = new Set([OPS.stroke, OPS.closeStroke, OPS.fill, OPS.eoFill, OPS.fillStroke, OPS.eoFillStroke, OPS.closeFillStroke, OPS.closeEOFillStroke]);
+    const imageOps = new Set([OPS.paintImageXObject, OPS.paintInlineImageXObject, OPS.paintImageMaskXObject]);
+    function currentPlacement(sourceName) {
+        const box = normalizeBBox(transformUnitRect(multiplyTransform(viewport.transform, ctm)), viewport.width, viewport.height);
+        if (!box) return;
+        const drawIndex = placements.size;
+        const placementId = `${sourceName}#${drawIndex}`;
+        placements.set(placementId, { x: box.x, yTop: box.y, w: box.width, h: box.height, bbox: box, sourceName, placementId });
+    }
+    function recordVector() {
+        if (!pathBounds) {
+            vectorPaintCount += 1;
+            uncertain = true;
+            pathUncertain = true;
+            return;
+        }
+        const ratio = (pathBounds.width * pathBounds.height) / pageArea;
+        const nearWhite = fillColor && fillColor.every(value => value >= 0.97);
+        if (nearWhite && ratio >= 0.95) return;
+        vectorPaintCount += 1;
+        vectorBounds.push({ ...pathBounds, precision: pathUncertain ? 'unknown' : 'approximate' });
+    }
     for (let idx = 0; idx < ops.fnArray.length; idx += 1) {
         const fn = ops.fnArray[idx];
         const args = ops.argsArray[idx];
         if (fn === OPS.save) {
-            stack.push([...ctm]);
+            stack.push({ ctm: [...ctm], fillColor });
         } else if (fn === OPS.restore) {
             if (stack.length) {
-                ctm = stack.pop();
+                const restored = stack.pop();
+                ctm = restored.ctm;
+                fillColor = restored.fillColor;
             }
         } else if (fn === OPS.transform) {
-            ctm = mul(ctm, args);
-        } else if (fn === OPS.paintImageXObject) {
-            const sourceName = args[0];
-            const imgW = Math.abs(ctm[0]) || Math.abs(ctm[2]) || 1;
-            const imgH = Math.abs(ctm[3]) || Math.abs(ctm[1]) || 1;
-            const imgX = ctm[4];
-            const imgY = ctm[5];
-            const yTop = pageHeight - imgY - imgH;
-            const drawIndex = placements.size;
-            const placementId = `${sourceName}#${drawIndex}`;
-            placements.set(placementId, { x: imgX, yTop, w: imgW, h: imgH, sourceName, placementId });
+            ctm = multiplyTransform(ctm, args);
+        } else if (fn === OPS.setFillRGBColor) {
+            if (typeof args?.[0] === 'string' && /^#[a-f0-9]{6}$/i.test(args[0])) {
+                fillColor = [1, 3, 5].map(index => Number.parseInt(args[0].slice(index, index + 2), 16) / 255);
+            } else {
+                const values = Array.from(args || []).map(Number);
+                const scale = Math.max(...values) > 1 ? 255 : 1;
+                fillColor = values.slice(0, 3).map(value => value / scale);
+            }
+        } else if (imageOps.has(fn)) {
+            currentPlacement(typeof args?.[0] === 'string' ? args[0] : `inline-${idx}`);
+        } else if (fn === OPS.paintImageXObjectRepeat) {
+            const sourceName = typeof args?.[0] === 'string' ? args[0] : `repeat-${idx}`;
+            const positions = Array.isArray(args?.[3]) || ArrayBuffer.isView(args?.[3]) ? Array.from(args[3]) : [];
+            if (!positions.length) {
+                currentPlacement(sourceName);
+                uncertain = true;
+            } else {
+                for (let pos = 0; pos + 1 < positions.length; pos += 2) {
+                    const saved = ctm;
+                    ctm = multiplyTransform(ctm, [args[1] || 1, 0, 0, args[2] || 1, positions[pos], positions[pos + 1]]);
+                    currentPlacement(sourceName);
+                    ctm = saved;
+                }
+            }
+        } else if (fn === OPS.constructPath) {
+            const rawBounds = Array.isArray(args?.[2]) || ArrayBuffer.isView(args?.[2]) ? Array.from(args[2]) : null;
+            if (rawBounds?.length >= 4 && rawBounds.slice(0, 4).every(Number.isFinite)) {
+                const matrix = multiplyTransform(viewport.transform, ctm);
+                const minX = rawBounds[0] === rawBounds[2] ? rawBounds[0] - 0.5 : rawBounds[0];
+                const maxX = rawBounds[0] === rawBounds[2] ? rawBounds[2] + 0.5 : rawBounds[2];
+                const minY = rawBounds[1] === rawBounds[3] ? rawBounds[1] - 0.5 : rawBounds[1];
+                const maxY = rawBounds[1] === rawBounds[3] ? rawBounds[3] + 0.5 : rawBounds[3];
+                pathBounds = normalizeBBox(bboxFromPoints([
+                    transformPoint(matrix, minX, minY),
+                    transformPoint(matrix, minX, maxY),
+                    transformPoint(matrix, maxX, minY),
+                    transformPoint(matrix, maxX, maxY),
+                ]), viewport.width, viewport.height);
+                pathUncertain = false;
+            } else {
+                pathBounds = null;
+                pathUncertain = true;
+            }
+            if (paintOps.has(args?.[0])) {
+                recordVector();
+                pathBounds = null;
+                pathUncertain = false;
+            }
+        } else if (paintOps.has(fn)) {
+            recordVector();
+            pathBounds = null;
+            pathUncertain = false;
+        } else if (fn === OPS.shadingFill) {
+            vectorPaintCount += 1;
+            uncertain = true;
+            warnings.push('vector_shading_bounds_unknown');
+        } else if (fn === OPS.paintFormXObjectBegin || fn === OPS.paintFormXObjectEnd) {
+            uncertain = true;
+        } else if (fn === OPS.clip || fn === OPS.eoClip || fn === OPS.endPath) {
+            pathBounds = null;
+            pathUncertain = false;
         }
     }
-    return placements;
+    const rasterUnion = unionBBoxes([...placements.values()].map(value => value.bbox), viewport.width, viewport.height);
+    const vectorUnion = unionBBoxes(vectorBounds, viewport.width, viewport.height);
+    return {
+        placements,
+        visualSignals: {
+            rasterCount: placements.size,
+            rasterCoverage: { value: rasterUnion ? Math.min(1, rasterUnion.width * rasterUnion.height / pageArea) : 0, precision: 'approximate' },
+            vectorPaintCount,
+            vectorCoverage: vectorUnion
+                ? { value: Math.min(1, vectorUnion.width * vectorUnion.height / pageArea), precision: uncertain ? 'approximate' : 'approximate' }
+                : { value: vectorPaintCount > 0 ? null : 0, precision: vectorPaintCount > 0 ? 'unknown' : 'exact' },
+            vectorBounds,
+            uncertain,
+            warnings: [...new Set(warnings)],
+        },
+    };
 }
 
 export async function inspectCanvasForDebug(canvas, kind, context = {}) {

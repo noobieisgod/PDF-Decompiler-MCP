@@ -1,0 +1,53 @@
+%PDF-1.7
+% synthetic licensing-safe fixture
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Rotate 0 /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R /Annots [6 0 R 7 0 R 8 0 R 9 0 R 10 0 R] >>
+endobj
+5 0 obj
+<< /Length 56 >>
+stream
+BT /F1 12 Tf 72 710 Td (Annotated visible content) Tj ET
+endstream
+endobj
+6 0 obj
+<< /Type /Annot /Subtype /Text /Rect [72 650 96 674] /Contents (Review note) /T (Alice) /CreationDate (D:20250102030405Z) /M (D:20250103040506Z) /C [1 1 0] /F 4 >>
+endobj
+7 0 obj
+<< /Type /Annot /Subtype /Highlight /Rect [72 695 230 725] /QuadPoints [72 725 230 725 72 695 230 695] /Contents (Important highlight) /T (Bob) /C [1 0 0] >>
+endobj
+8 0 obj
+<< /Type /Annot /Subtype /FreeText /Rect [300 620 500 680] /Contents (Free text annotation) /T (Carol) /C [0 0 1] >>
+endobj
+9 0 obj
+<< /Type /Annot /Subtype /Underline /Rect [72 580 230 610] /QuadPoints [72 610 230 610 72 580 230 580] /Contents (Underline annotation) /T (Dana) >>
+endobj
+10 0 obj
+<< /Type /Annot /Subtype /Text /Rect [110 650 134 674] /Contents (Reply note) /T (Eve) /IRT 6 0 R /RT /R >>
+endobj
+xref
+0 11
+0000000000 65535 f 
+0000000044 00000 n 
+0000000093 00000 n 
+0000000150 00000 n 
+0000000220 00000 n 
+0000000397 00000 n 
+0000000503 00000 n 
+0000000682 00000 n 
+0000000855 00000 n 
+0000000987 00000 n 
+0000001151 00000 n 
+trailer
+<< /Size 11 /Root 1 0 R >>
+startxref
+1275
+%%EOF

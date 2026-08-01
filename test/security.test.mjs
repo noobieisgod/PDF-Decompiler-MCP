@@ -90,6 +90,6 @@ test('every redirect is revalidated and private redirect targets are rejected', 
 
 test('signature and document-size limits are hard pre-parse checks with sanitized error data', async t => {
     const { config } = await temporaryConfig(t, { maxDocumentBytes: 8 });
-    assert.throws(() => validatePdfBytes(Buffer.from('not-pdf'), config), { code: 'invalid_pdf' });
+    assert.throws(() => validatePdfBytes(Buffer.from('not-pdf'), config), { code: 'PDF_INVALID_SIGNATURE' });
     assert.throws(() => validatePdfBytes(Buffer.from('%PDF-12345'), config), { code: 'document_too_large' });
 });

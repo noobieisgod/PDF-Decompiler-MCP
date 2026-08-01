@@ -4,6 +4,7 @@ import https from 'node:https';
 import net from 'node:net';
 import path from 'node:path';
 import { PdfDecompilerError } from '../core/errors.mjs';
+import { parserErrorPayload } from '../runtime/parser-errors.mjs';
 
 const WINDOWS_DEVICE = /^(?:\\\\[.?]\\|\\\\\?\\GLOBALROOT|(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\.|$))/i;
 const WINDOWS_RESERVED_COMPONENT = /^(?:CON|PRN|AUX|NUL|COM[1-9]|LPT[1-9])(?:\..*)?$/i;
@@ -143,7 +144,32 @@ export async function fetchRemotePdf(source, config, options = {}) {
 export function validatePdfBytes(bytes, config) {
     if (bytes.length > config.maxDocumentBytes) throw new PdfDecompilerError('document_too_large', 'The PDF exceeds the configured size limit.');
     if (bytes.length < 5 || bytes.subarray(0, 5).toString('ascii') !== '%PDF-') {
-        throw new PdfDecompilerError('invalid_pdf', 'The source does not have a valid PDF signature.');
+        const parser = parserErrorPayload('PDF_INVALID_SIGNATURE');
+        throw new PdfDecompilerError(parser.code, parser.message, { parser });
+    }
+    const tail = bytes.subarray(Math.max(0, bytes.length - 4096)).toString('latin1');
+    if (!/%%EOF\s*$/.test(tail)) {
+        const parser = parserErrorPayload('PDF_TRUNCATED');
+        throw new PdfDecompilerError(parser.code, parser.message, { parser });
+    }
+    const startMatch = /startxref\s+(\d+)\s+%%EOF\s*$/.exec(tail);
+    if (!startMatch) {
+        const parser = parserErrorPayload('PDF_INVALID_STARTXREF');
+        throw new PdfDecompilerError(parser.code, parser.message, { parser });
+    }
+    const offset = Number(startMatch[1]);
+    const xrefHead = bytes.subarray(offset, Math.min(bytes.length, offset + 4096)).toString('latin1');
+    if (!Number.isSafeInteger(offset) || offset < 5 || offset >= bytes.length || (!xrefHead.startsWith('xref') && !/^\d+\s+\d+\s+obj\b/.test(xrefHead))) {
+        const parser = parserErrorPayload('PDF_INVALID_STARTXREF');
+        throw new PdfDecompilerError(parser.code, parser.message, { parser });
+    }
+    if (xrefHead.startsWith('xref')) {
+        const lines = xrefHead.split(/\r?\n/);
+        const section = /^(\d+)\s+(\d+)\s*$/.exec(lines[1] || '');
+        if (!section || !/^\d{10}\s+\d{5}\s+[fn]\s*$/.test(lines[2] || '')) {
+            const parser = parserErrorPayload('PDF_INVALID_XREF');
+            throw new PdfDecompilerError(parser.code, parser.message, { parser });
+        }
     }
 }
 

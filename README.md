@@ -6,7 +6,7 @@ Version 3.0.0 is implemented in this source tree but has not been published. Pac
 
 ## Requirements
 
-- Node.js 22 or 24. CI tests both versions on Windows, macOS, and Linux.
+- Node.js 22 or 24. Windows tests both versions as the blocking CI matrix. macOS and Linux jobs are best-effort and do not support a compatibility claim until they pass.
 - npm 10 or newer.
 - Optional Tesseract executable on `PATH` for OCR.
 - Optional `@huggingface/transformers@4.2.0` peer dependency for semantic retrieval.
@@ -65,6 +65,12 @@ The legacy `extract_pdf_content` tool has been removed and is not aliased. See [
 
 Every element, citation, asset, render, canonical export, and `pdf-decompiler://` resource URI carries the extraction fingerprint. A reference from another generation returns a structured stale-reference error. Active cached generations are immutable and protected by leases during retrieval, rendering, rebuilds, deletion, and eviction.
 
+Canonical format version 2 and extraction revision 2 preserve displayed-page geometry and invalidate version 1 canonical cache entries. Public bboxes use PDF points after CropBox and rotation, with a top-left origin. Link text is string or null, internal destinations are structured, and annotation subtype, content, geometry, authorship, dates, color, flags, and reply provenance are retained where available. Reading-order and link-overlap thresholds are named internal heuristics, not public constants.
+
+Raster and vector content share one bounded PDF.js operator inspection. Vector bounds may be conservative and are labeled exact, approximate, or unknown. Meaningful vector-only pages are never blank. Uncertain visual pages emit `visual_unknown` and expose a deferred, budgeted, generation-bound render without eager full-page rendering during decomposition.
+
+Malformed input returns one enumerated sanitized `PDF_*` parser code. Worker rejection, exception, timeout, crash, missing output, malformed output, and stderr noise are contained without exposing raw parser details.
+
 ## Partial decomposition and budgets
 
 `pdf_open` can decompose selected page intervals. The result remains partial until continuation cursors process every missing interval. Search and retrieval operate on the available generation without pretending omitted pages were processed.
@@ -107,6 +113,8 @@ No-cache mode never writes document data into the persistent cache tree. Closing
 
 Persistent generations use atomic staging and replacement, hashes, corruption recovery, locks, leases, configurable retention, size-bounded LRU eviction, and active-document protection. Cache status reports the location, permission result, retention, size limit, and stored data classes. On supported POSIX systems directories use mode `0700` and files `0600`; Windows uses owner ACLs through `icacls`. Shared roots are rejected by default and require an explicit opt-in, but each OS user still receives a separate namespace.
 
+Every successful `pdf_open` returns a distinct process-local `sourceId` and safe descriptor, even when byte-identical opens share canonical data. `pdf_close(sourceId)` releases only that handle. The final handle prevents new work, waits for existing operations, releases the generation lease, and then removes process-local state. Source descriptors never affect canonical identity, indexes, citations, resources, or cache keys.
+
 The cache can contain original PDFs, extracted text, images, renders, indexes, metadata, and embeddings. Review backup policy and enable full-disk encryption where document sensitivity requires it. [`docs/PRIVACY.md`](docs/PRIVACY.md) lists exactly what is stored, retention behavior, deletion semantics, and verification limits.
 
 ## Image delivery and resources
@@ -129,15 +137,18 @@ CLI options:
 --debug
 ```
 
-Environment variables use the `PDF_DECOMPILER_` prefix. Root lists are JSON arrays. Numeric values are validated as finite positive limits before the server starts. See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) for every variable, default, precedence rule, and security implication.
+Environment variables use the `PDF_DECOMPILER_` prefix. Root lists are JSON arrays. Numeric values are validated as finite positive limits before the server starts. `PDF_DECOMPILER_TIMING=1` adds sanitized operation and stdio phase durations to stderr without logging paths, labels, queries, or extracted content. See [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) for every variable, default, precedence rule, and security implication.
 
 ## Development and validation
 
 ```powershell
 npm ci
 npm run fixtures:generate
+npm run fixtures:verify
 npm run schemas:generate
 npm test
+$env:PDF_DECOMPILER_TEST_OCR='1'; npm run test:ocr
+npm run test:local-pdfs
 npm run check
 npm run docs:check
 npm run license:check
@@ -146,11 +157,13 @@ npm run benchmark
 npm run package:verify -- artifacts\package-verification
 ```
 
-Fixtures are generated from source and contain no third-party document content. CI runs Node.js 22 and 24 on Windows, macOS, and Linux, plus an OCR integration job and package inspection job. Platform-specific tests run only where the host supports drive casing, UNC paths, symlinks, junctions, ACLs, permission denial, process monitoring, and atomic filesystem semantics.
+Forty-one deterministic fixtures are generated from source with hashes, intended features, expected classifications, geometry requirements, warnings, errors, and licensing metadata. They contain no third-party document content. The ignored `Heavy Test One.pdf`, `Medium Test One.pdf`, and `Medium Test Two.pdf` files are optional local integration samples and are excluded from Git and package allowlists.
+
+CI requires Node.js 22 and 24 on Windows for extraction, geometry, security, cache, packaging, MCP, and available OCR validation. macOS, Linux, and remote Linux OCR jobs remain configured as best-effort coverage. Unexecuted platform-specific behavior is reported as unverified. Tests run only where the host supports drive casing, UNC paths, symlinks, junctions, ACLs, permission denial, process monitoring, and atomic filesystem semantics.
 
 The official MCP TypeScript client 2.0.0 passes the automated protocol suite. MCP Inspector CLI 2.0.0 completes JSON `tools/list` over stdio and exposes all seven input and output schemas. Other Inspector behaviors and external desktop clients remain explicitly partial or untested in [`docs/CLIENT-COMPATIBILITY.md`](docs/CLIENT-COMPATIBILITY.md).
 
-Benchmark output reports observed medians and fixture details. The project makes no universal latency, accuracy, or token-savings claim. See [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
+Benchmark output reports one observed cold open, warm open, and search measurement with fixture and runtime details. It does not claim a median or universal latency, accuracy, or token savings. See [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md).
 
 ## Packaging and release status
 

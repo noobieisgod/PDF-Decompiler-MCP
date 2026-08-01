@@ -13,6 +13,20 @@ function modelWithAsset() {
     return buildCanonicalModel(Buffer.from('%PDF-cache'), raw, { extractorVersion: '3.0.0', maxPages: 5000, ocrPolicy: 'auto' }, 'deps');
 }
 
+test('canonical cache version 1 is never served under format version 2', async t => {
+    const { config } = await temporaryConfig(t, { cacheMode: 'persistent' });
+    const cache = await new CacheManager(config).init();
+    t.after(() => cache.close());
+    const model = modelWithAsset();
+    await cache.saveGeneration(model, Buffer.from('%PDF-cache'), buildBm25(model));
+    const manifestPath = path.join(cache.generationPath(model.documentId, model.extractionFingerprint), 'manifest.json');
+    const manifest = JSON.parse(await fs.readFile(manifestPath, 'utf8'));
+    manifest.version = 1;
+    await fs.writeFile(manifestPath, JSON.stringify(manifest));
+    assert.equal(await cache.generationExists(model.documentId, model.extractionFingerprint), false);
+    assert.equal(await cache.loadGeneration(model.documentId, model.extractionFingerprint), null);
+});
+
 test('persistent cache is atomic, generation immutable, corruption-aware, and lease protected', async t => {
     const { config } = await temporaryConfig(t, { cacheMode: 'persistent' });
     const first = await new CacheManager(config).init();
@@ -26,7 +40,7 @@ test('persistent cache is atomic, generation immutable, corruption-aware, and le
     assert.equal(loaded.model.documentId, model.documentId);
     assert.equal(loaded.model.assets[0].data, model.assets[0].data);
     const lease = await first.acquireLease(model.documentId, model.extractionFingerprint);
-    await assert.rejects(second.deleteGeneration(model.documentId, model.extractionFingerprint), { code: 'active_generation' });
+    await assert.rejects(second.deleteGeneration(model.documentId, model.extractionFingerprint), { code: 'CACHE_GENERATION_IN_USE' });
     first.config.cache.maxBytes = 1;
     assert.deepEqual((await first.evict()).removed, []);
     assert.equal(await first.generationExists(model.documentId, model.extractionFingerprint), true);

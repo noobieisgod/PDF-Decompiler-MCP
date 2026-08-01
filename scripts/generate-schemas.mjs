@@ -10,6 +10,7 @@ import {
     OpenSchema,
     RenderPageSchema,
     SearchSchema,
+    OutputSchemas,
 } from '../src/server/schemas.mjs';
 
 const schemas = {
@@ -21,6 +22,7 @@ const schemas = {
     'pdf_render_page.input': RenderPageSchema,
     'pdf_close.input': CloseSchema,
     'result-envelope': EnvelopeSchema,
+    ...Object.fromEntries(Object.entries(OutputSchemas).map(([name, schema]) => [`${name}.output`, schema])),
 };
 
 await fs.mkdir('schemas', { recursive: true });

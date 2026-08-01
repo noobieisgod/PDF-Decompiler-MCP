@@ -1,5 +1,10 @@
 {
   "license": "CC0-1.0",
   "generator": "test/fixtures/generate-fixtures.mjs",
-  "provenance": "Generated entirely from programmatic text and vector primitives; no third-party document content."
+  "manifest": "fixtures.manifest.json",
+  "localOnlyExcluded": [
+    "Heavy Test One.pdf",
+    "Medium Test One.pdf",
+    "Medium Test Two.pdf"
+  ]
 }

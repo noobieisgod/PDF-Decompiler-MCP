@@ -1,4 +1,5 @@
 import path from 'node:path';
+import { randomUUID } from 'node:crypto';
 import pkg from '../../package.json' with { type: 'json' };
 import { CacheManager } from '../cache/cache-manager.mjs';
 import { fingerprint, sha256 } from '../core/crypto.mjs';
@@ -10,6 +11,7 @@ import { loadPdfSource } from '../security/source.mjs';
 import { applyResultBudget, resolveBudget } from './budget.mjs';
 import { CursorCodec } from './cursor.mjs';
 import { runExtractionSubprocess, runRenderSubprocess } from './subprocess.mjs';
+import { timingMark } from './timing.mjs';
 
 const dependencyFingerprint = fingerprint({
     node: process.versions.node.split('.')[0],
@@ -49,6 +51,7 @@ export class DocumentManager {
         this.states = new Map();
         this.currentGeneration = new Map();
         this.closedStates = new Set();
+        this.closedHandles = new Map();
     }
 
     async init() {
@@ -65,10 +68,7 @@ export class DocumentManager {
     async activate(model, pdfBytes, bm25, semantic = null, { persisted = false, extractionConfig = this.config } = {}) {
         const key = stateKey(model.documentId, model.extractionFingerprint);
         const existing = this.states.get(key);
-        if (existing) {
-            existing.openCount += 1;
-            return existing;
-        }
+        if (existing) return existing;
         if (!model.partial && !persisted) await this.cache.saveGeneration(model, pdfBytes, bm25, semantic);
         const leaseId = !model.partial ? await this.cache.acquireLease(model.documentId, model.extractionFingerprint) : null;
         const state = {
@@ -80,7 +80,10 @@ export class DocumentManager {
             indexes: indexModel(model),
             derivedAssets: new Map(),
             leaseId,
-            openCount: 1,
+            handles: new Map(),
+            operationCount: 0,
+            operationWaiters: [],
+            closing: false,
             persisted: persisted || !model.partial,
             extractionConfig,
         };
@@ -90,24 +93,49 @@ export class DocumentManager {
         return state;
     }
 
+    sourceDescriptor(loaded, sourceLabel) {
+        const supplied = typeof sourceLabel === 'string' ? sourceLabel.replace(/[\u0000-\u001f\u007f]/g, '').trim().slice(0, 128) : '';
+        const sourceKind = loaded.sourceUrl ? 'https' : 'local';
+        const basename = loaded.sourcePath ? path.basename(loaded.sourcePath) : null;
+        const host = loaded.sourceUrl ? new URL(loaded.sourceUrl).host : null;
+        return {
+            sourceId: randomUUID(),
+            sourceKind,
+            sourceLabel: supplied || basename || host || 'PDF source',
+            basename,
+            host,
+            callerProvidedLabel: Boolean(supplied),
+        };
+    }
+
+    addSourceHandle(state, descriptor) {
+        state.handles.set(descriptor.sourceId, descriptor);
+        this.closedHandles.delete(descriptor.sourceId);
+        this.closedStates.delete(stateKey(state.model.documentId, state.model.extractionFingerprint));
+        return descriptor;
+    }
+
     async open(args) {
         if (args.cursor) return this.continueOpen(args);
         const loaded = await loadPdfSource(args.source, this.config);
+        const descriptor = this.sourceDescriptor(loaded, args.sourceLabel);
         const documentId = `doc_${sha256(loaded.bytes)}`;
         const extractionConfig = { ...this.config, ocrPolicy: args.ocrPolicy || this.config.ocrPolicy };
         const generation = this.generationForCurrentConfig(extractionConfig);
         const key = stateKey(documentId, generation);
         const active = this.states.get(key);
         if (active) {
+            if (active.closing) throw new PdfDecompilerError('closed_document', 'The document generation is closing.');
             if (args.refresh) throw new PdfDecompilerError('active_generation', 'Close the active extraction generation before refreshing it.');
-            active.openCount += 1;
-            return this.openResult(active, { cacheHit: true });
+            this.addSourceHandle(active, descriptor);
+            return this.openResult(active, descriptor, { cacheHit: true });
         }
         if (!args.refresh && this.config.cache.mode === 'persistent') {
             const cached = await this.cache.loadGeneration(documentId, generation);
             if (cached) {
                 const state = await this.activate(cached.model, cached.pdfBytes, cached.bm25 || buildBm25(cached.model), cached.semantic, { persisted: true, extractionConfig });
-                return this.openResult(state, { cacheHit: true });
+                this.addSourceHandle(state, descriptor);
+                return this.openResult(state, descriptor, { cacheHit: true });
             }
         }
         if (args.refresh && this.config.cache.mode === 'persistent' && await this.cache.generationExists(documentId, generation)) {
@@ -128,17 +156,18 @@ export class DocumentManager {
         const model = buildCanonicalModel(loaded.bytes, extracted.result, extractionConfig, dependencyFingerprint);
         const bm25 = buildBm25(model);
         const state = await this.activate(model, loaded.bytes, bm25, null, { extractionConfig });
+        this.addSourceHandle(state, descriptor);
         state.diagnostics = extracted.diagnostics;
-        return this.openResult(state, { cacheHit: false });
+        return this.openResult(state, descriptor, { cacheHit: false });
     }
 
-    openResult(state, { cacheHit }) {
+    openResult(state, descriptor, { cacheHit }) {
         const nextCursor = state.model.partial?.nextPage
             ? this.cursors.encode({
                 documentId: state.model.documentId,
                 extractionFingerprint: state.model.extractionFingerprint,
                 operation: 'pdf_open',
-                argumentsValue: { documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint },
+                argumentsValue: { documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint, sourceId: descriptor.sourceId },
                 position: state.model.partial.nextPage,
             }) : null;
         return {
@@ -149,19 +178,23 @@ export class DocumentManager {
             complete: !state.model.partial,
             nextCursor,
             cacheHit,
+            sourceId: descriptor.sourceId,
+            sourceDescriptor: descriptor,
             cache: this.cache.status(state.model),
             diagnostics: state.diagnostics || null,
         };
     }
 
     async continueOpen(args) {
-        if (!args.documentId || !args.extractionFingerprint) throw new PdfDecompilerError('invalid_cursor_context', 'Continuation requires documentId and extractionFingerprint.');
+        if (!args.documentId || !args.extractionFingerprint || !args.sourceId) throw new PdfDecompilerError('invalid_cursor_context', 'Continuation requires documentId, extractionFingerprint, and sourceId.');
         const state = await this.requireState(args.documentId, args.extractionFingerprint);
+        const descriptor = state.handles.get(args.sourceId);
+        if (!descriptor) throw new PdfDecompilerError('SOURCE_HANDLE_UNKNOWN', 'The source handle is unavailable.');
         const nextPage = this.cursors.decode(args.cursor, {
             documentId: args.documentId,
             extractionFingerprint: args.extractionFingerprint,
             operation: 'pdf_open',
-            argumentsValue: { documentId: args.documentId, extractionFingerprint: args.extractionFingerprint },
+            argumentsValue: { documentId: args.documentId, extractionFingerprint: args.extractionFingerprint, sourceId: args.sourceId },
         });
         if (nextPage !== state.model.partial?.nextPage) throw new PdfDecompilerError('stale_cursor', 'The decomposition cursor no longer matches document state.');
         const pages = missingPageIntervals(state.model.totalPages, state.model.pages.map(page => page.number));
@@ -189,7 +222,7 @@ export class DocumentManager {
             state.leaseId = await this.cache.acquireLease(state.model.documentId, state.model.extractionFingerprint);
             state.persisted = true;
         }
-        return this.openResult(state, { cacheHit: false });
+        return this.openResult(state, descriptor, { cacheHit: false });
     }
 
     async requireState(documentId, generation = null) {
@@ -197,27 +230,48 @@ export class DocumentManager {
         if (!selectedGeneration) throw new PdfDecompilerError('closed_document', 'The document is not open.');
         if (this.closedStates.has(stateKey(documentId, selectedGeneration))) throw new PdfDecompilerError('closed_document', 'The document is closed. Open it again before using document tools.');
         const state = this.states.get(stateKey(documentId, selectedGeneration));
-        if (state) return state;
+        if (state) {
+            if (state.closing) throw new PdfDecompilerError('closed_document', 'The document generation is closing.');
+            return state;
+        }
         if (this.config.cache.mode !== 'persistent') throw new PdfDecompilerError('expired_process_state', 'The process-local document state has expired.');
         const cached = await this.cache.loadGeneration(documentId, selectedGeneration);
         if (!cached) throw new PdfDecompilerError('cache_generation_missing', 'The extraction generation is unavailable.');
         return this.activate(cached.model, cached.pdfBytes, cached.bm25 || buildBm25(cached.model), cached.semantic, { persisted: true });
     }
 
+    async withOperation(documentId, generation, callback) {
+        const state = await this.requireState(documentId, generation);
+        state.operationCount += 1;
+        try {
+            return await callback(state);
+        } finally {
+            state.operationCount -= 1;
+            if (state.operationCount === 0) state.operationWaiters.splice(0).forEach(resolve => resolve());
+        }
+    }
+
+    async waitForOperations(state) {
+        if (state.operationCount === 0) return;
+        await new Promise(resolve => state.operationWaiters.push(resolve));
+    }
+
     async documentInfo(args) {
-        const state = await this.requireState(args.documentId, args.extractionFingerprint);
+        return this.withOperation(args.documentId, args.extractionFingerprint, async state => {
         const counts = Object.fromEntries(['block', 'table', 'figure', 'annotation', 'link'].map(type => [type, state.model.elements.filter(item => item.type === type).length]));
         const { elements: _elements, assets: _assets, ...document } = modelView(state.model);
         return {
             ...document,
             counts,
+            activeSources: [...state.handles.values()],
             cache: { ...this.cache.status(state.model), activeLeases: await this.cache.activeLeases(state.model.documentId, state.model.extractionFingerprint) },
             resourceLifetime: this.config.cache.mode === 'persistent' ? 'until_generation_deleted_or_evicted' : this.config.cache.mode === 'ephemeral' ? 'owning_process_and_document_lifetime' : 'active_document_lifetime',
         };
+        });
     }
 
     async search(args) {
-        const state = await this.requireState(args.documentId, args.extractionFingerprint);
+        return this.withOperation(args.documentId, args.extractionFingerprint, async state => {
         const strategy = args.strategy || 'full_text';
         const options = { pages: args.pages, elementTypes: args.elementTypes };
         const warnings = [];
@@ -258,10 +312,11 @@ export class DocumentManager {
             budget: { configured: resolveBudget(args.budget), usage: bounded.usage, estimators: { text: 'utf8_bytes_divided_by_4' } },
             nextCursor: bounded.nextOffset === null ? null : this.cursors.encode({ documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint, operation: 'pdf_search', argumentsValue: cursorArguments, position: bounded.nextOffset }),
         };
+        });
     }
 
     async getPages(args) {
-        const state = await this.requireState(args.documentId, args.extractionFingerprint);
+        return this.withOperation(args.documentId, args.extractionFingerprint, async state => {
         const requested = new Set(args.pages || []);
         for (const range of args.pageRanges || []) {
             const start = range.start ?? 1;
@@ -303,6 +358,7 @@ export class DocumentManager {
             budget: { configured: resolveBudget(args.budget), usage: bounded.usage, estimators: { text: 'utf8_bytes_divided_by_4' } },
             nextCursor: bounded.nextOffset === null ? null : this.cursors.encode({ documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint, operation: 'pdf_get_pages', argumentsValue: cursorArguments, position: bounded.nextOffset }),
         };
+        });
     }
 
     async getElement(args) {
@@ -311,36 +367,37 @@ export class DocumentManager {
         if (current && current !== args.extractionFingerprint && !this.states.has(stateKey(args.documentId, args.extractionFingerprint))) {
             throw new PdfDecompilerError('stale_reference', 'The element reference belongs to a different extraction generation.');
         }
-        let state;
         try {
-            state = await this.requireState(args.documentId, args.extractionFingerprint);
+            return await this.withOperation(args.documentId, args.extractionFingerprint, async state => {
+                const element = state.indexes.elements.get(args.elementId);
+                if (!element) throw new PdfDecompilerError('stale_reference', 'The element does not exist in the requested extraction generation.');
+                return element;
+            });
         } catch (error) {
             if (['cache_generation_missing', 'expired_process_state', 'stale_extraction_fingerprint'].includes(error.code)) {
                 throw new PdfDecompilerError('stale_reference', 'The element reference belongs to an unavailable extraction generation.');
             }
             throw error;
         }
-        const element = state.indexes.elements.get(args.elementId);
-        if (!element) throw new PdfDecompilerError('stale_reference', 'The element does not exist in the requested extraction generation.');
-        return element;
     }
 
     async renderPage(args) {
-        const state = await this.requireState(args.documentId, args.extractionFingerprint);
+        return this.withOperation(args.documentId, args.extractionFingerprint, async state => {
+        const bbox = Array.isArray(args.bbox) ? { x: args.bbox[0], y: args.bbox[1], width: args.bbox[2], height: args.bbox[3] } : args.bbox || null;
         const pageRecord = state.indexes.pages.get(args.page);
         if (!pageRecord) throw new PdfDecompilerError('page_unavailable', 'The page has not been decomposed or does not exist.');
         const budget = resolveBudget(args.budget);
         if (budget.renderedPages < 1) throw new PdfDecompilerError('budget_exhausted', 'The rendered-page budget is zero.');
         const format = args.format === 'jpeg' ? 'jpeg'
             : args.format === 'png' ? 'png'
-                : args.bbox && pageRecord.contentClass === 'visual' ? 'jpeg' : 'png';
+                : bbox && pageRecord.contentClass === 'visual' ? 'jpeg' : 'png';
         const maxDimension = Math.min(args.maxDimension || budget.imageDimension, budget.imageDimension, 4096);
         if (maxDimension < 64) throw new PdfDecompilerError('budget_exhausted', 'The image-dimension budget is below the minimum render size.');
-        const renderKey = fingerprint({ page: args.page, bbox: args.bbox || null, format, maxDimension });
+        const renderKey = fingerprint({ page: args.page, bbox, format, maxDimension });
         const id = `render:${args.page}:${renderKey.slice(0, 24)}`;
         let asset = state.derivedAssets.get(id);
         if (!asset) {
-            const rendered = await runRenderSubprocess(state.pdfBytes, this.config, { page: args.page, bbox: args.bbox || null, format, maxDimension });
+            const rendered = await runRenderSubprocess(state.pdfBytes, this.config, { page: args.page, bbox, format, maxDimension });
             asset = {
                 id,
                 kind: 'page-render',
@@ -368,6 +425,7 @@ export class DocumentManager {
             if (this.config.cache.mode === 'persistent') await this.cache.saveDerivedAsset(asset);
         }
         return asset;
+        });
     }
 
     async readResource(uri) {
@@ -376,7 +434,12 @@ export class DocumentManager {
         const [, documentId, generation, kind, encodedId] = match;
         const id = decodeURIComponent(encodedId);
         let state = this.states.get(stateKey(documentId, generation));
+        const activeState = state || null;
         let temporaryLease = null;
+        if (activeState) {
+            if (activeState.closing) throw new PdfDecompilerError('closed_document', 'The document generation is closing.');
+            activeState.operationCount += 1;
+        }
         if (!state) {
             const reason = await this.cache.unavailableReason(documentId, generation);
             if (this.config.cache.mode !== 'persistent') {
@@ -397,36 +460,85 @@ export class DocumentManager {
                 await this.cache.releaseLease(temporaryLease);
                 throw new PdfDecompilerError('cache_generation_missing', 'The extraction generation is unavailable.');
             }
-            state = { model: cached.model, indexes: indexModel(cached.model), derivedAssets: new Map() };
+            state = { model: cached.model, pdfBytes: cached.pdfBytes, indexes: indexModel(cached.model), derivedAssets: new Map() };
         }
         try {
             if (kind === 'canonical') return { mimeType: 'application/json', text: JSON.stringify(modelView(state.model), null, 2) };
-            let asset = state.indexes.assets.get(id) || state.derivedAssets.get(id);
-            if (!asset && this.config.cache.mode === 'persistent') asset = await this.cache.loadDerivedAsset(documentId, generation, id);
+            let asset = state.derivedAssets.get(id) || state.indexes.assets.get(id);
+            if ((!asset || !asset.data) && this.config.cache.mode === 'persistent') asset = await this.cache.loadDerivedAsset(documentId, generation, id) || asset;
+            if (asset?.deferredRender && !asset.data) {
+                const rendered = await runRenderSubprocess(state.pdfBytes, this.config, asset.deferredRender);
+                asset = {
+                    ...asset,
+                    data: rendered.data,
+                    mimeType: rendered.mimeType,
+                    width: rendered.width,
+                    height: rendered.height,
+                    sha256: sha256(Buffer.from(rendered.data, 'base64')),
+                };
+                state.derivedAssets.set(id, asset);
+                if (this.config.cache.mode === 'persistent') await this.cache.saveDerivedAsset(asset);
+            }
             if (!asset?.data) throw new PdfDecompilerError('missing_asset', 'The requested asset is unavailable.');
             return { mimeType: asset.mimeType, blob: asset.data };
         } finally {
+            if (activeState) {
+                activeState.operationCount -= 1;
+                if (activeState.operationCount === 0) activeState.operationWaiters.splice(0).forEach(resolve => resolve());
+            }
             if (temporaryLease) await this.cache.releaseLease(temporaryLease);
         }
     }
 
     async closeDocument(args) {
-        const state = await this.requireState(args.documentId, args.extractionFingerprint);
-        state.openCount -= 1;
-        if (state.openCount > 0) return { closed: false, remainingReferences: state.openCount, cacheDeleted: false };
+        timingMark('document_lookup');
+        const key = stateKey(args.documentId, args.extractionFingerprint);
+        const state = this.states.get(key);
+        if (!state) {
+            if (args.sourceId && this.closedHandles.has(args.sourceId)) throw new PdfDecompilerError('SOURCE_HANDLE_ALREADY_CLOSED', 'The source handle is already closed.');
+            if (args.sourceId) throw new PdfDecompilerError('SOURCE_HANDLE_UNKNOWN', 'The source handle is unavailable.');
+            throw new PdfDecompilerError('closed_document', 'The document is not open.');
+        }
+        let sourceId = args.sourceId;
+        if (!sourceId) {
+            if (state.handles.size !== 1) throw new PdfDecompilerError('SOURCE_HANDLE_REQUIRED', 'sourceId is required when multiple source handles are active.');
+            sourceId = state.handles.keys().next().value;
+        }
+        if (!state.handles.has(sourceId)) {
+            if (this.closedHandles.has(sourceId)) throw new PdfDecompilerError('SOURCE_HANDLE_ALREADY_CLOSED', 'The source handle is already closed.');
+            throw new PdfDecompilerError('SOURCE_HANDLE_UNKNOWN', 'The source handle is unavailable.');
+        }
+        if (args.deleteCache && (state.handles.size > 1 || state.operationCount > 0)) {
+            throw new PdfDecompilerError('CACHE_GENERATION_IN_USE', 'The extraction generation has active source handles or operations.');
+        }
+        state.handles.delete(sourceId);
+        timingMark('handle_release');
+        this.closedHandles.set(sourceId, Date.now());
+        while (this.closedHandles.size > 1024) this.closedHandles.delete(this.closedHandles.keys().next().value);
+        if (state.handles.size > 0) return { closed: true, sourceId, remainingHandles: state.handles.size, cacheDeleted: false, deletionVerified: true };
+        state.closing = true;
+        await this.waitForOperations(state);
         if (state.leaseId) await this.cache.releaseLease(state.leaseId);
-        this.states.delete(stateKey(state.model.documentId, state.model.extractionFingerprint));
-        this.closedStates.add(stateKey(state.model.documentId, state.model.extractionFingerprint));
+        timingMark('lease_release');
+        this.states.delete(key);
+        this.closedStates.add(key);
         if (this.currentGeneration.get(state.model.documentId) === state.model.extractionFingerprint) this.currentGeneration.delete(state.model.documentId);
         let deletion = { deleted: false, verified: true };
         if (args.deleteCache) deletion = await this.cache.deleteGeneration(state.model.documentId, state.model.extractionFingerprint, { ignoreMissing: true, reason: 'deleted' });
         else await this.cache.cleanupDocumentState(state.model.documentId, state.model.extractionFingerprint);
-        return { closed: true, cacheDeleted: deletion.deleted, deletionVerified: deletion.verified };
+        timingMark(args.deleteCache ? 'cache_deletion' : 'resource_cleanup');
+        return { closed: true, sourceId, remainingHandles: 0, cacheDeleted: deletion.deleted, deletionVerified: deletion.verified };
     }
 
     async close() {
-        for (const state of this.states.values()) if (state.leaseId) await this.cache.releaseLease(state.leaseId);
+        for (const state of this.states.values()) {
+            state.closing = true;
+            state.handles.clear();
+            await this.waitForOperations(state);
+            if (state.leaseId) await this.cache.releaseLease(state.leaseId);
+        }
         this.states.clear();
+        this.currentGeneration.clear();
         await this.cache.close();
     }
 }

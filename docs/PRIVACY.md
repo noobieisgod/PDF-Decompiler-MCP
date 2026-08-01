@@ -4,7 +4,9 @@ PDF Decompiler MCP has no telemetry. It does not call an AI service. Network acc
 
 ## Data stored
 
-Depending on the document and enabled features, state can contain the original PDF, source hash, local source path while active, extracted text, OCR text, metadata, outlines, annotations, links, tables, cells, images, page and crop renders, BM25 terms and positions, semantic embeddings, warnings, diagnostics, cursor keys, access timestamps, and deletion tombstones.
+Depending on the document and enabled features, state can contain the original PDF, source hash, extracted text, OCR text and word geometry, metadata, outlines, annotations, links, tables, cells, images, page and crop renders, BM25 terms and positions, semantic embeddings, warnings, diagnostics, cursor keys, access timestamps, and deletion tombstones.
+
+The loader discards full local paths and full source URLs after loading bytes. Each successful open retains only a process-local safe descriptor: random `sourceId`, source kind, basename or host, sanitized label, and whether the caller supplied the label. Two byte-identical opens may share canonical data while retaining separate descriptors. Descriptors are never written to canonical caches, indexes, citations, resource URIs, or extraction fingerprints.
 
 `pdf_document_info` reports cache mode, exact generation location, permission status, retention, maximum size, active leases, stored data categories, and resource lifetime.
 
@@ -30,7 +32,7 @@ Persistent data is placed under `users/<owner-fingerprint>` even when multiple o
 
 Persistent defaults are 30 days and 2 GiB. LRU eviction removes expired or least-recently-used generations until both bounds are satisfied. Active leases are never evicted or deleted.
 
-`pdf_close` preserves persistent cache by default. `deleteCache: true` deletes the exact generation after its final lease is released. Deletion returns whether removal occurred and whether absence was verified. Tombstones distinguish deleted, evicted, closed, and corrupt state. The implementation does not claim forensic erasure on flash storage, journaling filesystems, snapshots, or backups.
+`pdf_close(sourceId)` releases only that handle. Omitting `sourceId` is accepted only when exactly one handle is active. The final close waits for current operations and then releases process-local state. `deleteCache: true` fails atomically while other handles or operations use the persistent generation, and deletes only after the selected final handle and lease can be released. Deletion returns whether removal occurred and whether absence was verified. Tombstones distinguish deleted, evicted, closed, and corrupt state. The implementation does not claim forensic erasure on flash storage, journaling filesystems, snapshots, or backups.
 
 Backups can retain PDFs, text, images, and embeddings beyond configured retention. Exclude the cache directory from backups when that is not acceptable. Use full-disk encryption for devices that may store sensitive documents. Administrative backup and encryption policy is outside this server.
 

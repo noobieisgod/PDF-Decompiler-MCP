@@ -2,5 +2,9 @@ node_modules/
 artifacts/
 .tmp-*/
 *.pdf
+!test/fixtures/generated/*.pdf
+test/fixtures/generated/Heavy Test One.pdf
+test/fixtures/generated/Medium Test One.pdf
+test/fixtures/generated/Medium Test Two.pdf
 .DS_Store
 Thumbs.db

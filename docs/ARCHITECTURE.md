@@ -8,10 +8,23 @@ PDF Decompiler MCP 3.0.0 is a native ESM, local stdio server. It uses the offici
 2. The exact PDF bytes produce `documentId = doc_<sha256>`.
 3. Schema, extractor, dependency, OCR, and relevant extraction settings produce `extractionFingerprint`.
 4. A child process extracts pages with hard document, page, deadline, image, output, and decompressed-result limits. Native memory enforcement is classified per platform.
-5. Extraction output becomes deterministic page, block, table, cell, figure, annotation, link, asset, warning, diagnostic, and citation records.
-6. BM25 is built immediately. Semantic indexing is optional, lazy, and disabled by default.
-7. Tools retrieve bounded subsets. Signed cursors continue results without placing queries or paths in their payload.
-8. Assets and exported canonical records use immutable generation-bound `pdf-decompiler://` resource URIs.
+5. PDF.js viewport transforms normalize text spans, annotation rectangles, links, raster placements, OCR words, and table cells into displayed-page coordinates.
+6. Extraction output becomes deterministic page, block, table, cell, figure, annotation, link, asset, warning, diagnostic, and citation records.
+7. BM25 is built immediately. Semantic indexing is optional, lazy, and disabled by default.
+8. Tools retrieve bounded subsets. Signed cursors continue results without placing queries or paths in their payload.
+9. Assets and exported canonical records use immutable generation-bound `pdf-decompiler://` resource URIs.
+
+## Canonical format 2
+
+Canonical format version 2 and extraction revision 2 invalidate version 1 cache records. They add displayed-page geometry, structured internal link destinations, normalized annotation records, bounded visual signals, source-handle aware lifecycle data, and schema-enforced parser errors. Version 1 records are re-extracted because discarded geometry and provenance cannot be reconstructed safely.
+
+Bounding boxes use PDF points after CropBox and page rotation, with a top-left origin, x increasing right, and y increasing down. Values are rounded to three decimals. A block box is the union of valid span boxes. Coordinates within 0.5 points of a page edge may be clamped; larger invalid boxes become null with `invalid_geometry`.
+
+Reading order uses normalized geometry, line relationships, gutters, spanning regions, and deterministic source-index and ID tie-breakers. Column, link-overlap, mixed-page, and table thresholds are named internal heuristics. Tests may justify tuning them without changing public schemas. Ambiguous layouts retain deterministic order and may emit `layout_ambiguous`.
+
+Internal links use named, explicit, or unresolved destination records. Parser-provided visible text is preferred. Geometry-derived anchor text requires meaningful overlap, line-aware ordering, duplicate removal, and deterministic conflict resolution. Raw PDF.js arrays and dictionaries are never canonical data.
+
+Visual classification reuses one bounded operator-list pass. Raster coverage is derived from image placements. Vector coverage is conservative and marked exact, approximate, or unknown. Shadings, nested forms, masks, clipping, and uncertain transforms may produce `visual_unknown`. Normal decomposition never renders a full page solely to classify it. A vector-only or unknown visual page receives a generation-bound deferred page-visual resource.
 
 ## Canonical identity contract
 
@@ -43,6 +56,8 @@ Writes use a staging path followed by atomic rename. Per-generation locks serial
 
 Ephemeral and no-cache modes use owner-restricted process directories outside the persistent tree. See [Privacy](PRIVACY.md) for lifecycle details.
 
+Every successful open also creates a random process-local `sourceId`. Multiple handles can share one canonical generation while retaining independent safe descriptors. The final handle waits for existing operation leases, prevents new work from entering the closing generation, and then releases in-memory and cache leases. Source descriptors never enter canonical storage or identity inputs.
+
 ## Retrieval
 
 BM25 tokenizes Unicode text with NFKC normalization, persists term positions, and indexes blocks, tables and cells, OCR text, captions, annotations, metadata, and outline entries. Ordering is score, page, reading order, then ID. Semantic search uses cosine-equivalent dot product over normalized vectors. Hybrid search uses reciprocal-rank fusion with `k = 60`.
@@ -59,4 +74,4 @@ Mode defaults are applied first, inclusion and exclusion overrides second, and h
 
 All seven tools return a structured envelope and compact JSON text fallback. Rendering returns an inline MCP image only after explicit `imageDelivery: "inline"`. The protocol has no generic negotiated inline-image capability, so `auto` conservatively returns a resource link and a textual URI. Resources are read-only.
 
-The stdio entry uses `serveStdio`, supports the MCP 2026 protocol era implemented by SDK v2, and accepts supported 2025-era openings through the SDK legacy path.
+The stdio entry uses the official server transport from MCP TypeScript SDK 2.0.0. Automated tests cover SDK client discovery and structured results, plus a raw `2025-06-18` initialization. Compatibility claims are limited to the exact versions and behaviors recorded in [Client Compatibility](CLIENT-COMPATIBILITY.md).

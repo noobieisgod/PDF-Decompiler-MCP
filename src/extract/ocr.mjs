@@ -13,6 +13,7 @@ import {
     OCR_MIN_WORDLIKE_RATIO,
     OCR_MIN_WORDS,
 } from '../config/constants.mjs';
+import { unionBBoxes } from '../model/geometry.mjs';
 
 let tesseractAvailableCache;
 
@@ -90,13 +91,54 @@ export function ocrTextLooksGood(text) {
     return { ok: true, reason: null };
 }
 
-export async function runTesseractOcr(pngBytes, pageNum) {
+function parseTsv(value, geometry) {
+    const rows = value.replace(/\r\n/g, '\n').split('\n').slice(1).map(line => line.split('\t')).filter(columns => columns.length >= 12 && columns[0] === '5' && columns[11]?.trim());
+    const xScale = geometry?.pageWidth && geometry?.pixelWidth ? geometry.pageWidth / geometry.pixelWidth : 1;
+    const yScale = geometry?.pageHeight && geometry?.pixelHeight ? geometry.pageHeight / geometry.pixelHeight : 1;
+    const words = rows.map((columns, sourceIndex) => ({
+        text: columns[11].trim(),
+        block: columns[2],
+        paragraph: columns[3],
+        line: columns[4],
+        confidence: Number(columns[10]),
+        sourceIndex,
+        bbox: {
+            x: Number(columns[6]) * xScale,
+            y: Number(columns[7]) * yScale,
+            width: Number(columns[8]) * xScale,
+            height: Number(columns[9]) * yScale,
+        },
+    }));
+    const grouped = new Map();
+    for (const word of words) {
+        const key = `${word.block}:${word.paragraph}`;
+        if (!grouped.has(key)) grouped.set(key, []);
+        grouped.get(key).push(word);
+    }
+    const blocks = [...grouped.values()].map(group => {
+        const lines = new Map();
+        for (const word of group) {
+            if (!lines.has(word.line)) lines.set(word.line, []);
+            lines.get(word.line).push(word);
+        }
+        return {
+            text: [...lines.values()].map(line => line.sort((a, b) => a.bbox.x - b.bbox.x || a.sourceIndex - b.sourceIndex).map(word => word.text).join(' ')).join('\n'),
+            role: 'ocr',
+            bbox: unionBBoxes(group.map(word => word.bbox), geometry?.pageWidth, geometry?.pageHeight),
+            spans: group,
+            sourceIndex: Math.min(...group.map(word => word.sourceIndex)),
+        };
+    }).sort((a, b) => a.bbox?.y - b.bbox?.y || a.bbox?.x - b.bbox?.x || a.sourceIndex - b.sourceIndex);
+    return { words, blocks, text: blocks.map(block => block.text).join('\n\n') };
+}
+
+export async function runTesseractOcr(pngBytes, pageNum, geometry = null) {
     const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pdf-decompiler-ocr-'));
     const inputPath = path.join(tempDir, `page-${pageNum}.png`);
     try {
         fs.writeFileSync(inputPath, pngBytes);
-        const text = await new Promise((resolve, reject) => {
-            const proc = spawn('tesseract', [inputPath, 'stdout', '--psm', '6'], { windowsHide: true });
+        const tsv = await new Promise((resolve, reject) => {
+            const proc = spawn('tesseract', [inputPath, 'stdout', '--psm', '6', 'tsv'], { windowsHide: true });
             const chunks = [];
             const errChunks = [];
             proc.stdout.on('data', data => chunks.push(data));
@@ -118,14 +160,15 @@ export async function runTesseractOcr(pngBytes, pageNum) {
                 reject(err);
             });
         });
-        const cleaned = text.replace(/\r\n/g, '\n').trim();
+        const parsed = parseTsv(tsv, geometry);
+        const cleaned = parsed.text.trim();
         const quality = ocrTextLooksGood(cleaned);
         if (!quality.ok) {
-            return { ok: false, text: cleaned, reason: quality.reason };
+            return { ok: false, text: cleaned, blocks: parsed.blocks, words: parsed.words, reason: quality.reason };
         }
-        return { ok: true, text: cleaned, reason: null };
-    } catch (err) {
-        return { ok: false, text: '', reason: err?.message ?? String(err) };
+        return { ok: true, text: cleaned, blocks: parsed.blocks, words: parsed.words, reason: null };
+    } catch {
+        return { ok: false, text: '', reason: 'OCR process failed' };
     } finally {
         try {
             fs.rmSync(tempDir, { recursive: true, force: true });

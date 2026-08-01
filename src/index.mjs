@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-import { serveStdio } from '@modelcontextprotocol/server/stdio';
+import { serveStdio, StdioServerTransport } from '@modelcontextprotocol/server/stdio';
 import { pathToFileURL } from 'node:url';
 import { loadConfig } from './config/runtime.mjs';
 import { DocumentManager } from './runtime/document-manager.mjs';
 import { createServer } from './server/create-server.mjs';
+import { TimedTransport } from './runtime/timing.mjs';
 
 export function parseArgs(args) {
     const overrides = {};
@@ -37,6 +38,7 @@ export async function main(overrides = parseArgs(process.argv.slice(2))) {
     const manager = await new DocumentManager(config).init();
     const handle = serveStdio(() => createServer(manager), {
         legacy: 'serve',
+        transport: new TimedTransport(new StdioServerTransport()),
         onerror: error => console.error(`[pdf-decompiler-mcp] ${config.debug ? error.stack : error.message}`),
     });
     let closing = false;

@@ -5,8 +5,33 @@ import path from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { PdfDecompilerError } from '../core/errors.mjs';
+import { isParserErrorPayload, parserErrorPayload } from './parser-errors.mjs';
 
 const execFileAsync = promisify(execFile);
+
+function parserFailure(code, details = {}) {
+    const parser = parserErrorPayload(code, details.diagnosticId);
+    return new PdfDecompilerError(parser.code, parser.message, { parser, ...(details.enforcement ? { enforcement: details.enforcement } : {}) });
+}
+
+export async function readExtractionWorkerResult({ output, exitCode, stderr = '', config, enforcement }) {
+    const stat = await fs.stat(output).catch(() => null);
+    if (!stat || stat.size > Math.min(256 * 1024 * 1024, config.maxDecompressedBytes)) throw parserFailure('PDF_PARSER_CRASH', { enforcement });
+    let payload;
+    try {
+        payload = JSON.parse(await fs.readFile(output, 'utf8'));
+    } catch {
+        if (config.debug && stderr) console.error('[pdf-parser-worker]', stderr);
+        throw parserFailure('PDF_PARSER_CRASH', { enforcement });
+    }
+    if (!payload.ok || exitCode !== 0) {
+        if (config.debug && stderr) console.error('[pdf-parser-worker]', stderr);
+        if (isParserErrorPayload(payload.error)) throw new PdfDecompilerError(payload.error.code, payload.error.message, { parser: payload.error, enforcement });
+        throw parserFailure('PDF_PARSER_CRASH', { enforcement });
+    }
+    if (!payload.result || !Array.isArray(payload.result.pages) || !Number.isInteger(payload.result.totalPages)) throw parserFailure('PDF_PARSER_CRASH', { enforcement });
+    return payload.result;
+}
 
 async function workingSet(pid) {
     try {
@@ -78,18 +103,9 @@ export async function runExtractionSubprocess(pdfBytes, config, options = {}) {
             child.once('error', reject);
             child.once('exit', code => resolve(code));
         });
-        if (timedOut) throw new PdfDecompilerError('subprocess_timeout', 'PDF decomposition exceeded the wall-clock limit.', { enforcement });
+        if (timedOut) throw parserFailure('PDF_PARSER_TIMEOUT', { enforcement });
         if (exceededMemory) throw new PdfDecompilerError('subprocess_memory_limit', 'PDF decomposition exceeded the memory threshold.', { enforcement });
-        const stat = await fs.stat(output).catch(() => null);
-        if (!stat || stat.size > Math.min(256 * 1024 * 1024, config.maxDecompressedBytes)) throw new PdfDecompilerError('subprocess_output_limit', 'PDF decomposition exceeded the output limit.', { enforcement });
-        let payload;
-        try {
-            payload = JSON.parse(await fs.readFile(output, 'utf8'));
-        } catch {
-            throw new PdfDecompilerError('decomposition_failed', 'PDF decomposition failed.', config.debug ? { enforcement, stderr } : { enforcement });
-        }
-        if (!payload.ok || exitCode !== 0) throw new PdfDecompilerError('decomposition_failed', 'PDF decomposition failed.', config.debug ? { enforcement, stderr, worker: payload.error } : { enforcement });
-        return { result: payload.result, diagnostics: { enforcement } };
+        return { result: await readExtractionWorkerResult({ output, exitCode, stderr, config, enforcement }), diagnostics: { enforcement } };
     } finally {
         clearTimeout(timer);
         clearInterval(monitor);

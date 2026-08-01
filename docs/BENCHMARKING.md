@@ -6,7 +6,7 @@ Run:
 npm run benchmark
 ```
 
-The command emits machine-readable JSON with the exact Node version, platform, cache and semantic settings, cold and warm open latency, search latency, process RSS, cache bytes, response bytes, extraction completion, expected retrieval page, and citation check. It uses a generated CC0 fixture and makes no comparative claim.
+The command emits machine-readable JSON with the exact Node version, platform, cache and semantic settings, cold and warm open latency, search latency, process RSS, cache bytes, response bytes, extraction completion, expected retrieval page, and citation check. The current command performs one measured repetition, uses a generated CC0 fixture, and makes no comparative claim. It does not report a median until the harness is configured for multiple repetitions.
 
 Any published result must additionally record hardware, operating system build, client and version, model identifier, provider and API path, PDF category, retrieval mode, image delivery, budgets, cache state, repetition count, median and dispersion, peak child memory method, fixture revision, and PDF Decompiler MCP commit.
 

@@ -1,15 +1,16 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import pkg from '../../package.json' with { type: 'json' };
+import { timingComplete, timingContext, timingMark, timingSnapshot } from '../runtime/timing.mjs';
 import { publicError } from '../core/errors.mjs';
 import {
     CloseSchema,
     DocumentInfoSchema,
-    EnvelopeSchema,
     GetElementSchema,
     GetPagesSchema,
     OpenSchema,
     RenderPageSchema,
     SearchSchema,
+    OutputSchemas,
 } from './schemas.mjs';
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
@@ -67,25 +68,34 @@ function publicAsset(asset) {
 }
 
 function toolHandler(operation, managerCall, { assetResult = false } = {}) {
-    return async args => {
+    return async args => timingContext(operation, async () => {
+        timingMark('request_receipt');
         try {
             const raw = await managerCall(args);
+            timingMark('manager_operation');
             const data = assetResult ? publicAsset(raw) : raw;
             const value = envelope(operation, args, data);
+            if (timingSnapshot()) value.diagnostics = { ...(value.diagnostics || {}), ...timingSnapshot() };
             const requestedBytes = Math.min(args.budget?.responseBytes || 1_000_000, 4_000_000);
             if (assetResult && args.imageDelivery === 'inline' && Buffer.byteLength(raw.data || '', 'base64') > requestedBytes) {
                 value.warnings.push({ code: 'inline_image_omitted', message: 'The image exceeded the response-byte budget and was returned as a resource link.' });
             }
-            return {
+            const result = {
                 content: resultContent(value, assetResult ? raw : null, args.imageDelivery, requestedBytes),
                 structuredContent: value,
             };
+            timingMark('response_serialization');
+            timingComplete();
+            return result;
         } catch (error) {
             const failure = publicError(error);
             const value = envelope(operation, args, { error: failure });
-            return { content: [{ type: 'text', text: compactText(value) }], structuredContent: value, isError: true };
+            const result = { content: [{ type: 'text', text: compactText(value) }], structuredContent: value, isError: true };
+            timingMark('response_serialization');
+            timingComplete();
+            return result;
         }
-    };
+    });
 }
 
 export function createServer(manager) {
@@ -99,7 +109,7 @@ export function createServer(manager) {
         title: 'Open and decompose PDF',
         description: 'Open an allowed local or HTTPS PDF, decompose it under hard bounds, and return its exact extraction generation. Continue partial work with the returned cursor.',
         inputSchema: OpenSchema,
-        outputSchema: EnvelopeSchema,
+        outputSchema: OutputSchemas.pdf_open,
         annotations: READ_ONLY,
     }, toolHandler('pdf_open', args => manager.open(args)));
 
@@ -107,7 +117,7 @@ export function createServer(manager) {
         title: 'Get PDF document information',
         description: 'Return metadata, decomposition counts, cache status, warnings, and generation-bound resource lifetime.',
         inputSchema: DocumentInfoSchema,
-        outputSchema: EnvelopeSchema,
+        outputSchema: OutputSchemas.pdf_document_info,
         annotations: READ_ONLY,
     }, toolHandler('pdf_document_info', args => manager.documentInfo(args)));
 
@@ -115,7 +125,7 @@ export function createServer(manager) {
         title: 'Search decomposed PDF',
         description: 'Search extracted elements with offline BM25, optional semantic retrieval, or reciprocal-rank fused hybrid retrieval.',
         inputSchema: SearchSchema,
-        outputSchema: EnvelopeSchema,
+        outputSchema: OutputSchemas.pdf_search,
         annotations: READ_ONLY,
     }, toolHandler('pdf_search', args => manager.search(args)));
 
@@ -123,7 +133,7 @@ export function createServer(manager) {
         title: 'Get PDF page elements',
         description: 'Return deterministic cited elements for selected pages under explicit response budgets and signed cursors.',
         inputSchema: GetPagesSchema,
-        outputSchema: EnvelopeSchema,
+        outputSchema: OutputSchemas.pdf_get_pages,
         annotations: READ_ONLY,
     }, toolHandler('pdf_get_pages', args => manager.getPages(args)));
 
@@ -131,7 +141,7 @@ export function createServer(manager) {
         title: 'Get PDF element',
         description: 'Resolve one element only within the supplied immutable extraction generation. Stale references are rejected.',
         inputSchema: GetElementSchema,
-        outputSchema: EnvelopeSchema,
+        outputSchema: OutputSchemas.pdf_get_element,
         annotations: READ_ONLY,
     }, toolHandler('pdf_get_element', args => manager.getElement(args)));
 
@@ -139,7 +149,7 @@ export function createServer(manager) {
         title: 'Render PDF page',
         description: 'Render a bounded page or crop. Auto uses a resource because MCP does not negotiate a generic inline-image capability. Inline data is returned only when explicitly requested.',
         inputSchema: RenderPageSchema,
-        outputSchema: EnvelopeSchema,
+        outputSchema: OutputSchemas.pdf_render_page,
         annotations: READ_ONLY,
     }, toolHandler('pdf_render_page', args => manager.renderPage(args), { assetResult: true }));
 
@@ -147,7 +157,7 @@ export function createServer(manager) {
         title: 'Close PDF document',
         description: 'Release the caller reference. Process-local data is deleted when the final reference closes; persistent cache deletion is explicit.',
         inputSchema: CloseSchema,
-        outputSchema: EnvelopeSchema,
+        outputSchema: OutputSchemas.pdf_close,
         annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: false, openWorldHint: false },
     }, toolHandler('pdf_close', args => manager.closeDocument(args)));
 

@@ -9,6 +9,7 @@ export class PdfDecompilerError extends Error {
 
 export function publicError(error) {
     if (error instanceof PdfDecompilerError) {
+        if (error.details?.parser) return error.details.parser;
         return error.details === undefined
             ? { code: error.code, message: error.message }
             : { code: error.code, message: error.message, details: error.details };

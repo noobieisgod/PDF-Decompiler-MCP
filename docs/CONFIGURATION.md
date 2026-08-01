@@ -22,6 +22,7 @@ Local file access is denied by default until at least one allow root is configur
 | `PDF_DECOMPILER_SEMANTIC_ENABLED` | `false` | Enable semantic and hybrid ranking |
 | `PDF_DECOMPILER_SEMANTIC_ALLOW_DOWNLOAD` | `false` | Permit first-use download of the pinned model |
 | `PDF_DECOMPILER_CURSOR_TTL_MS` | `3600000` | Signed cursor validity period |
+| `PDF_DECOMPILER_TIMING` | `false` | Emit sanitized per-phase MCP and stdio timing to stderr |
 | `PDF_DECOMPILER_DEBUG` | `false` | Put detailed child diagnostics on stderr; never stdout |
 
 Boolean variables accept `1` or `true`.
@@ -37,3 +38,5 @@ node src/index.mjs
 ```
 
 Configuration affecting extraction changes `extractionFingerprint`. References retained from another generation are rejected instead of being resolved against the current model.
+
+`PDF_DECOMPILER_TIMING=1` records operation IDs and durations for request receipt, document lookup, handle release, lease release, cache deletion or process-local cleanup, serialization, response handoff, and stdio send completion. It never records paths, source labels, URLs, queries, or extracted text. The setting is diagnostic only and does not change extraction fingerprints.

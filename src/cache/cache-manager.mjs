@@ -141,7 +141,8 @@ export class CacheManager {
     }
 
     async generationExists(documentId, generation) {
-        return exists(path.join(this.generationPath(documentId, generation), 'manifest.json'));
+        const manifest = await fs.readFile(path.join(this.generationPath(documentId, generation), 'manifest.json'), 'utf8').then(JSON.parse, () => null);
+        return manifest?.version === 2 && manifest?.canonicalFormatVersion === 2;
     }
 
     lockPath(documentId, generation) {
@@ -175,14 +176,16 @@ export class CacheManager {
     async saveGeneration(model, pdfBytes, bm25 = null, semantic = null) {
         const destination = this.generationPath(model.documentId, model.extractionFingerprint);
         return this.withLock(model.documentId, model.extractionFingerprint, async () => {
-            if (await exists(path.join(destination, 'manifest.json'))) return destination;
+            const existingManifest = await fs.readFile(path.join(destination, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
+            if (existingManifest?.version === 2 && existingManifest?.canonicalFormatVersion === model.canonicalFormatVersion) return destination;
+            if (existingManifest) await fs.rm(destination, { recursive: true, force: true });
             const staging = `${destination}.staging-${process.pid}-${randomUUID()}`;
             await fs.mkdir(path.join(staging, 'assets'), { recursive: true, mode: 0o700 });
             const persistedAssets = [];
             for (const asset of model.assets) {
                 const extension = asset.mimeType === 'image/jpeg' ? 'jpg' : 'png';
-                const filename = `${sha256(asset.id).slice(0, 24)}.${extension}`;
-                if (asset.data) await fs.writeFile(path.join(staging, 'assets', filename), Buffer.from(asset.data, 'base64'), { mode: 0o600 });
+                const filename = asset.data ? `${sha256(asset.id).slice(0, 24)}.${extension}` : null;
+                if (filename) await fs.writeFile(path.join(staging, 'assets', filename), Buffer.from(asset.data, 'base64'), { mode: 0o600 });
                 persistedAssets.push({ ...asset, data: undefined, filename });
             }
             const persistedModel = { ...model, assets: persistedAssets };
@@ -191,7 +194,9 @@ export class CacheManager {
             if (bm25) await atomicJson(path.join(staging, 'bm25.json'), bm25);
             if (semantic) await atomicJson(path.join(staging, 'semantic.json'), semantic);
             const manifest = {
-                version: 1,
+                version: 2,
+                canonicalFormatVersion: model.canonicalFormatVersion,
+                extractionRevision: model.extractionRevision,
                 documentId: model.documentId,
                 extractionFingerprint: model.extractionFingerprint,
                 createdAt: Date.now(),
@@ -220,14 +225,20 @@ export class CacheManager {
     async loadGeneration(documentId, generation) {
         const root = this.generationPath(documentId, generation);
         const manifest = await fs.readFile(path.join(root, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
-        if (!manifest || manifest.documentId !== documentId || manifest.extractionFingerprint !== generation) return null;
+        if (!manifest || manifest.version !== 2 || manifest.canonicalFormatVersion !== 2
+            || manifest.documentId !== documentId || manifest.extractionFingerprint !== generation) return null;
         const canonicalBytes = await fs.readFile(path.join(root, 'canonical.json')).catch(() => null);
         if (!canonicalBytes || sha256(canonicalBytes) !== manifest.files['canonical.json']) {
             await this.deleteGeneration(documentId, generation, { ignoreMissing: true, reason: 'corrupt' });
             return null;
         }
         const model = JSON.parse(canonicalBytes.toString('utf8'));
+        if (model.canonicalFormatVersion !== 2 || model.extractionRevision !== 2) return null;
         for (const asset of model.assets) {
+            if (!asset.filename) {
+                asset.data = null;
+                continue;
+            }
             const assetPath = path.join(root, 'assets', asset.filename);
             const bytes = await fs.readFile(assetPath).catch(() => null);
             const expected = manifest.files[`assets/${asset.filename}`];
@@ -306,7 +317,7 @@ export class CacheManager {
                 }
                 throw new PdfDecompilerError('cache_generation_missing', 'The extraction generation is unavailable.');
             }
-            if (await this.activeLeases(documentId, generation)) throw new PdfDecompilerError('active_generation', 'The extraction generation is actively leased.');
+            if (await this.activeLeases(documentId, generation)) throw new PdfDecompilerError('CACHE_GENERATION_IN_USE', 'The extraction generation is actively leased.');
             await fs.rm(target, { recursive: true, force: true });
             await fs.rm(path.join(this.root, 'derived', documentId, generation), { recursive: true, force: true });
             await fs.rm(path.dirname(this.semanticPath(documentId, generation)), { recursive: true, force: true });

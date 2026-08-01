@@ -308,13 +308,16 @@ function buildLoadErrorResult(pageNum, err) {
         extractionMode: 'error',
         routingMode: 'page_error',
         contentClass: 'error',
-        fallbackReason: err?.message ?? String(err),
+        fallbackReason: 'Page extraction failed',
         filteredReason: null,
         ocrAttempted: false,
         ocrAccepted: false,
         ocrReason: null,
-        text: `(Page extraction failed: ${err?.message ?? err})`,
+        text: '(Page extraction failed)',
+        textBlocks: [],
         annotations: [],
+        annotationWidgetCount: 0,
+        warnings: [{ code: 'page_extraction_failed' }],
         pageProfile: {
             page: pageNum,
             wordCount: 0,
@@ -327,6 +330,17 @@ function buildLoadErrorResult(pageNum, err) {
             annotationsCount: 0,
             viewportWidth: 0,
             viewportHeight: 0,
+            rotation: 0,
+            visualType: 'unknown',
+            visualSignals: {
+                hasText: false,
+                rasterCount: 0,
+                rasterCoverage: { value: null, precision: 'unknown' },
+                vectorPaintCount: null,
+                vectorCoverage: { value: null, precision: 'unknown' },
+                annotationCount: 0,
+                warnings: ['page_extraction_failed'],
+            },
         },
         rawImages: [],
         rawTables: [],
@@ -503,7 +517,7 @@ export async function extractPageContent(pdfBytes, requestedPages, maxImageDim, 
         for (let idx = 0; idx < raw.rawTables.length; idx += 1) {
             const id = `TABLE_${globalTableIdx++}`;
             tableIdMap.set(idx, id);
-            tableResults.push({ id, data: raw.rawTables[idx].rows, bbox: raw.rawTables[idx].bbox });
+            tableResults.push({ id, data: raw.rawTables[idx].rows, cells: raw.rawTables[idx].cells || null, bbox: raw.rawTables[idx].bbox });
         }
 
         const annotations = (raw.annotations ?? []).map(annotation => ({ ...annotation }));
@@ -532,7 +546,18 @@ export async function extractPageContent(pdfBytes, requestedPages, maxImageDim, 
                     annotation.finalId = id;
                 }
             }
-            linkResults.push({ id, url: rawLink.url, anchored: rawLink.anchored });
+            linkResults.push({
+                id,
+                bbox: rawLink.bbox,
+                text: rawLink.text,
+                url: rawLink.url,
+                destination: rawLink.destination,
+                targetKind: rawLink.targetKind,
+                anchored: rawLink.anchored,
+                annotationText: rawLink.annotationText,
+                anchorSource: rawLink.anchorSource,
+                provenance: rawLink.provenance,
+            });
         }
         if (pageImageId) {
             text = text.replace('[PAGE_IMAGE_LOCAL_0]', `[${pageImageId}]`);
@@ -549,11 +574,14 @@ export async function extractPageContent(pdfBytes, requestedPages, maxImageDim, 
             ocrAccepted: raw.ocrAccepted,
             ocrReason: raw.ocrReason,
             text,
+            textBlocks: raw.textBlocks || [],
             images: imageResults,
             tables: tableResults,
             pageImage,
             links: linkResults,
             annotations,
+            annotationWidgetCount: raw.annotationWidgetCount || 0,
+            warnings: raw.warnings || [],
             pageProfile: raw.pageProfile,
         });
     }

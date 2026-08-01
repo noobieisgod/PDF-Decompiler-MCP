@@ -12,6 +12,7 @@ Version 3.0.0 is a breaking rebrand and workflow change from Lightweight PDF MCP
 | Environment prefix associated with the old product | `PDF_DECOMPILER_` variables in [`docs/CONFIGURATION.md`](docs/CONFIGURATION.md) |
 | One call to `extract_pdf_content` | Seven-tool open, inspect, retrieve, render, close workflow |
 | One eager text and image response | Structured generations, citations, budgets, cursors, and resources |
+| Filename used to distinguish an open document | Process-local `sourceId` and safe `sourceDescriptor`; content identity remains byte-derived |
 
 No old environment-variable alias is provided. Update configuration explicitly so a stale insecure setting cannot be accepted silently.
 
@@ -119,3 +120,9 @@ After:
 ```
 
 Node.js 18 and 20 configurations must move to Node.js 22 or 24. Update clients to retain both `documentId` and `extractionFingerprint` with every element reference.
+
+Every successful `pdf_open` also returns a distinct `sourceId`. Retain it until `pdf_close`, especially when the same bytes may be opened more than once. Closing without `sourceId` works only when exactly one handle is active for the generation.
+
+Canonical format version 2 changes link destinations from ambiguous strings to structured named, explicit, or unresolved records. Link text is string or null. Text, link, annotation, table-cell, raster, and OCR geometry use displayed-page point coordinates. Cache entries written with canonical format version 1 are not served and are re-extracted on the next open.
+
+Parser failures now use the enumerated `PDF_*` codes documented in [`docs/TOOLS.md`](docs/TOOLS.md). Clients must not depend on raw parser messages or create new codes from message text.

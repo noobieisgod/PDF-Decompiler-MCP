@@ -6,11 +6,11 @@ Every tool returns `structuredContent` and a compact JSON text content block. Th
 
 ## `pdf_open`
 
-Accepts a local path or HTTPS source, optional page intervals, OCR policy, refresh flag, image dimension, or partial-decomposition cursor. It returns the exact document and extraction generation, processed-page count, completion state, cache status, diagnostics, and cursor. A selected subset remains a partial generation until continuation processes every missing page.
+Accepts a local path or HTTPS source, optional `sourceLabel`, page intervals, OCR policy, refresh flag, image dimension, or partial-decomposition cursor. Every successful call returns a distinct random process-local `sourceId` and safe descriptor, even when identical bytes share the same document ID and canonical generation. A selected subset remains a partial generation until continuation processes every missing page. Continuation requires its original source handle.
 
 ## `pdf_document_info`
 
-Returns metadata, outline, page classifications, element counts, warnings, decomposition state, cache location and policy, active leases, and resource lifetime.
+Returns metadata, outline, page classifications, visual signals, element counts, warnings, decomposition state, cache location and policy, active leases, all active safe source descriptors for the generation, and resource lifetime.
 
 ## `pdf_search`
 
@@ -37,7 +37,34 @@ Full-page auto format is PNG. A crop on a page classified as visual may use JPEG
 
 ## `pdf_close`
 
-Releases one open reference. The final close removes process-local state. Persistent data is retained unless `deleteCache: true`. Active generation leases prevent deletion until operations finish.
+`pdf_close(sourceId)` releases only the selected handle. With exactly one handle, `sourceId` may be omitted. With multiple handles, omission returns `SOURCE_HANDLE_REQUIRED`. A repeated close returns `SOURCE_HANDLE_ALREADY_CLOSED`; an unknown or foreign-process handle returns `SOURCE_HANDLE_UNKNOWN`. Closing one handle never invalidates another handle sharing the same generation.
+
+The final close prevents new operations, waits for existing operation leases, releases the generation lease, and removes process-local state. Persistent data is retained unless `deleteCache: true`. Deletion fails atomically with `CACHE_GENERATION_IN_USE` while another handle or operation remains.
+
+## Canonical element records
+
+All public bounding boxes are `{ x, y, width, height }` in displayed-page PDF points, with a top-left origin. Link `text` is string or null. Internal link destinations are structured as `named`, `explicit`, or `unresolved` with bounded name, page, x, y, and zoom fields. External URLs and internal destinations are distinct. Annotation elements preserve normalized subtype, text, bbox, author, dates, RGB color, flags, reply relationship, support status, and PDF.js provenance where available.
+
+Page visual signals expose text presence, raster count and coverage, vector paint count and coverage, annotation count, and warnings. Each coverage measurement is labeled `exact`, `approximate`, or `unknown`. Meaningful vector-only pages are not blank. Unknown visual pages expose `visual_unknown` and a deferred generation-bound page visual.
+
+## Parser errors
+
+Malformed input uses one schema-enforced code:
+
+- `PDF_INVALID_SIGNATURE`
+- `PDF_TRUNCATED`
+- `PDF_INVALID_XREF`
+- `PDF_INVALID_STARTXREF`
+- `PDF_UNSUPPORTED_ENCRYPTION`
+- `PDF_PASSWORD_REQUIRED`
+- `PDF_DECOMPRESSION_LIMIT`
+- `PDF_PAGE_LIMIT`
+- `PDF_PARSER_TIMEOUT`
+- `PDF_PARSER_CRASH`
+- `PDF_UNSUPPORTED_FEATURE`
+- `PDF_MALFORMED_UNKNOWN`
+
+Each code maps to one sanitized category and safe message with retry, password, and configuration-change flags. Raw parser stderr, exception text, stack traces, and local paths are never public fields. Unknown backend errors use `PDF_MALFORMED_UNKNOWN`; worker protocol failures use `PDF_PARSER_CRASH`.
 
 ## Resource errors
 

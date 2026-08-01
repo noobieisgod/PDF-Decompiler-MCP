@@ -6,6 +6,7 @@ import {
     TABLE_MIN_ROWS,
 } from '../config/constants.mjs';
 import { groupItemsIntoRows } from './text.mjs';
+import { unionBBoxes } from '../model/geometry.mjs';
 
 function clusterAnchors(xs, tolerance = COL_X_TOLERANCE) {
     const anchors = [];
@@ -22,10 +23,11 @@ function clusterAnchors(xs, tolerance = COL_X_TOLERANCE) {
 
 function mapRowToAnchors(row, anchors, tolerance = COL_X_TOLERANCE * 8) {
     if (!anchors.length) {
-        return { filledColumns: new Set(), coverage: 0, cells: [] };
+        return { filledColumns: new Set(), coverage: 0, cells: [], cellItems: [] };
     }
     const cells = new Array(anchors.length).fill('');
     const filledColumns = new Set();
+    const cellItems = Array.from({ length: anchors.length }, () => []);
     for (const item of row) {
         let bestIndex = -1;
         let bestDelta = Infinity;
@@ -41,11 +43,13 @@ function mapRowToAnchors(row, anchors, tolerance = COL_X_TOLERANCE * 8) {
         }
         filledColumns.add(bestIndex);
         cells[bestIndex] = cells[bestIndex] ? `${cells[bestIndex]} ${item.str}` : item.str;
+        cellItems[bestIndex].push(item);
     }
     return {
         filledColumns,
         coverage: filledColumns.size / Math.max(anchors.length, 1),
         cells,
+        cellItems,
     };
 }
 
@@ -117,6 +121,18 @@ export function extractStructTables(structTree, mcidMap) {
         }
         return (node.children ?? []).map(getCellText).filter(Boolean).join(' ');
     }
+    function getCellBbox(node) {
+        const boxes = [];
+        function collect(value) {
+            if (value.type === 'content') {
+                const bbox = mcidMap.get(value.id)?.bbox;
+                if (bbox) boxes.push(bbox);
+            }
+            for (const child of value.children ?? []) collect(child);
+        }
+        collect(node);
+        return unionBBoxes(boxes);
+    }
     function getTableMcids(node, ids = new Set()) {
         if (node.type === 'content' && node.id != null) {
             ids.add(node.id);
@@ -130,6 +146,7 @@ export function extractStructTables(structTree, mcidMap) {
     function walkNode(node) {
         if (node.role === 'Table') {
             const rows = [];
+            const cellRows = [];
             for (const child of node.children ?? []) {
                 const trs = child.role === 'TR'
                     ? [child]
@@ -137,13 +154,17 @@ export function extractStructTables(structTree, mcidMap) {
                         ? (child.children ?? []).filter(c => c.role === 'TR')
                         : [];
                 for (const tr of trs) {
-                    const cells = (tr.children ?? []).filter(c => c.role === 'TD' || c.role === 'TH');
-                    if (!cells.length) {
+                    const cellNodes = (tr.children ?? []).filter(c => c.role === 'TD' || c.role === 'TH');
+                    if (!cellNodes.length) {
                         continue;
                     }
-                    const row = cells.map(cell => getCellText(cell).trim());
+                    const row = cellNodes.map(cell => getCellText(cell).trim());
                     if (row.some(Boolean)) {
                         rows.push(row);
+                        cellRows.push(cellNodes.map((cell, columnIndex) => ({
+                            text: row[columnIndex],
+                            bbox: getCellBbox(cell),
+                        })));
                     }
                 }
             }
@@ -158,7 +179,8 @@ export function extractStructTables(structTree, mcidMap) {
                         yBottom = Math.max(yBottom, entry.yTop + 12);
                     }
                 }
-                tables.push({ rows, mcids, yTop: Number.isFinite(yTop) ? yTop : 0, yBottom: yBottom || 100 });
+                const bbox = unionBBoxes(cellRows.flat().map(cell => cell.bbox));
+                tables.push({ rows, cells: cellRows, mcids, bbox, yTop: bbox?.y ?? (Number.isFinite(yTop) ? yTop : 0), yBottom: bbox ? bbox.y + bbox.height : (yBottom || 100) });
             }
             return;
         }
@@ -220,12 +242,23 @@ export function detectTables(items) {
             rowIndex = nextIndex;
             continue;
         }
-        const grid = tableRows.map(row => {
-            return mapRowToAnchors(row.items, tableAnchors).cells;
-        });
+        const mappedRows = tableRows.map(row => mapRowToAnchors(row.items, tableAnchors));
+        const grid = mappedRows.map(row => row.cells);
+        const populated = grid.flat().map(value => value.trim()).filter(Boolean);
+        const numericRatio = populated.filter(value => /(?:^|\s)[+-]?(?:\d+[.,]?\d*|\d*\.\d+)%?(?:\s|$)/.test(value)).length / Math.max(1, populated.length);
+        const averageLength = populated.reduce((sum, value) => sum + value.length, 0) / Math.max(1, populated.length);
+        if (numericRatio < 0.2 && averageLength > 12) {
+            nonTableItems.push(...tableRows.flatMap(row => row.items));
+            rowIndex = nextIndex;
+            continue;
+        }
+        const cells = mappedRows.map(row => row.cellItems.map((cellItems, columnIndex) => ({
+            text: row.cells[columnIndex],
+            bbox: unionBBoxes(cellItems.map(item => item.bbox)),
+        })));
         const yTop = Math.min(...tableRows.map(row => row.yTop));
         const yBottom = Math.max(...tableRows.map(row => row.yBottom));
-        tables.push({ rows: grid, yTop, yBottom });
+        tables.push({ rows: grid, cells, bbox: unionBBoxes(cells.flat().map(cell => cell.bbox)), yTop, yBottom });
         rowIndex = nextIndex;
     }
     return {
@@ -235,7 +268,10 @@ export function detectTables(items) {
 }
 
 export function pageLooksBlank(profile) {
-    return profile.wordCount === 0 && profile.imageCoverage === 0 && profile.annotationsCount === 0;
+    return profile.wordCount === 0
+        && profile.imageCoverage === 0
+        && profile.annotationsCount === 0
+        && profile.visualType === 'none';
 }
 
 export function pageLooksTableHeavy(profile) {

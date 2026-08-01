@@ -18,19 +18,49 @@
       "maximum": 9007199254740991
     },
     "bbox": {
-      "type": "array",
-      "items": [
+      "anyOf": [
         {
-          "type": "number"
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "width": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "height": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "width",
+            "height"
+          ],
+          "additionalProperties": false
         },
         {
-          "type": "number"
-        },
-        {
-          "type": "number"
-        },
-        {
-          "type": "number"
+          "type": "array",
+          "items": [
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            },
+            {
+              "type": "number"
+            }
+          ]
         }
       ]
     },
@@ -48,7 +78,6 @@
       "maximum": 4096
     },
     "imageDelivery": {
-      "description": "Auto conservatively returns a resource. Inline must be explicitly requested.",
       "type": "string",
       "enum": [
         "auto",
