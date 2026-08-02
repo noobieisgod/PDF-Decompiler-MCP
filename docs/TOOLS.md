@@ -2,7 +2,13 @@
 
 Generated input and envelope schemas are in [`schemas/`](../schemas/).
 
-Every tool returns `structuredContent` and a compact JSON text content block. The common envelope contains `schemaVersion`, `operation`, `documentId`, `extractionFingerprint`, `data`, `citations`, `warnings`, `diagnostics`, `omissions`, `budget`, and `nextCursor`.
+Every tool returns `structuredContent` and a bounded compact text content block. The common envelope contains `schemaVersion`, `operation`, `documentId`, `extractionFingerprint`, `data`, `citations`, `warnings`, `diagnostics`, `omissions`, `budget`, `completion`, and `nextCursor`. Common fields never repeat inside `data`.
+
+Completion fields are independent:
+
+- `documentComplete` means every PDF page has been processed into the canonical generation.
+- `requestedScopeComplete` means every page or region requested by this operation has been processed into the canonical generation.
+- `resultComplete` means the current retrieval cursor chain has no remaining output fragments.
 
 ## `pdf_open`
 
@@ -10,7 +16,7 @@ Accepts a local path or HTTPS source, optional `sourceLabel`, page intervals, OC
 
 ## `pdf_document_info`
 
-Returns metadata, outline, page classifications, visual signals, element counts, warnings, decomposition state, cache location and policy, active leases, all active safe source descriptors for the generation, and resource lifetime.
+Returns metadata, outline, page classifications, visual signals, element counts, decomposition state, cache location and policy, active leases, all active safe source descriptors for the generation, resource lifetime, and complete Markdown export status.
 
 ## `pdf_search`
 
@@ -18,11 +24,21 @@ Requires an exact document reference and query. Strategies are `full_text`, `sem
 
 ## `pdf_get_pages`
 
-Accepts page numbers or ranges, `text`, `balanced`, or `fidelity` mode, element inclusion and exclusion overrides, budgets, and a cursor. It returns deterministic elements and a citation for every returned element.
+Accepts page numbers or ranges, `text`, `balanced`, or `fidelity` mode, element inclusion and exclusion overrides, budgets, and a cursor. `outputFormat` is `structured` by default or `markdown`. `tableDetail` is `compact` by default or `full`.
+
+Structured data contains only `outputFormat`, `pages`, `elements`, and resource URIs. Markdown data contains only `outputFormat`, `markdownFormatVersion`, `pages`, `markdown`, and resource URIs. Citations, warnings, diagnostics, omissions, budget, completion, and cursor remain in the common envelope.
+
+Paged retrieval uses deterministic fair allocation across the normalized requested-page order. Cursors bind page order, per-page positions, current round-robin position, format, table detail, filters, inclusion overrides, budgets, extraction generation, and serializer versions. Permanently oversized items produce an omission and are advanced. The server never returns a zero-progress cursor.
+
+The full Markdown string appears once in structured content. Compact text contains a bounded summary, resource URI, and continuation instructions. Complete wire-size accounting includes the protocol wrapper, envelope, structured Markdown, compact text, citations, warnings, omissions, and resource links.
 
 ## `pdf_get_element`
 
 Requires `documentId`, `extractionFingerprint`, and `elementId`. The fingerprint is mandatory. Missing or unavailable-generation IDs return `stale_reference`; they never resolve by ordinal in another generation.
+
+For tables, optional `tableSelection` uses one-based inclusive row and column bounds. Omitted bounds select the canonical range. `includeHeaders` defaults to true. Non-table elements reject table selections. Results retain canonical row numbers, column numbers, cell IDs, spans, and citations and report total dimensions, selected range, context rows, and partial status.
+
+When a slice continues, canonical header rows may repeat as `contextRow: true`. They count fully toward budgets but do not advance canonical progress. A response containing only repeated context is invalid. Oversized rows are omitted explicitly rather than silently truncated, and the signed cursor continues only when new selected content or a progress-bearing omission remains.
 
 ## `pdf_render_page`
 
@@ -68,10 +84,12 @@ Each code maps to one sanitized category and safe message with retry, password, 
 
 ## Resource errors
 
-Resource reads use structured tool or MCP resource errors for `closed_document`, `process_local_resource_expired`, `deleted_generation`, `evicted_generation`, `corrupt_generation`, `stale_extraction_fingerprint`, `cache_generation_missing`, and `missing_asset`. Old URIs are never regenerated under a new fingerprint.
+Resource reads use structured tool or MCP resource errors for `closed_document`, `process_local_resource_expired`, `deleted_generation`, `evicted_generation`, `corrupt_generation`, `stale_extraction_fingerprint`, `stale_markdown_resource`, `cache_generation_missing`, and `missing_asset`. Old URIs are never regenerated under a new extraction or serializer fingerprint.
+
+Complete Markdown resources use full table detail. Generation is atomic and bounded by configured bytes, time, buffer usage, element count, table rows, table cells, and derived-cache entry size. A complete resource is never silently truncated. Limit failures direct callers to paged Markdown retrieval.
 
 ## Default budgets
 
 Defaults are 8,000 estimated text tokens, 1,000,000 response bytes, 20 pages, 200 blocks, 20 tables, 10 figures, 4 renders, and 1,200 image pixels. Hard ceilings are 32,000 tokens, 4,000,000 bytes, 100 pages, 2,000 blocks, 200 tables, 100 figures, 20 renders, and 4,096 pixels. Oversized items are omitted and reported.
 
-Text estimates use UTF-8 bytes divided by four. Image estimates use pixels divided by 750. Both are advisory and are named in results.
+Text estimates use UTF-8 bytes divided by four. Image estimates use pixels divided by 750. Both are advisory and are named in results. Exact final serialization remains the hard wire-size check.

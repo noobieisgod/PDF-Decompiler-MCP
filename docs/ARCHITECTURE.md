@@ -12,11 +12,11 @@ PDF Decompiler MCP 3.0.0 is a native ESM, local stdio server. It uses the offici
 6. Extraction output becomes deterministic page, block, table, cell, figure, annotation, link, asset, warning, diagnostic, and citation records.
 7. BM25 is built immediately. Semantic indexing is optional, lazy, and disabled by default.
 8. Tools retrieve bounded subsets. Signed cursors continue results without placing queries or paths in their payload.
-9. Assets and exported canonical records use immutable generation-bound `pdf-decompiler://` resource URIs.
+9. Assets, renders, and derived Markdown use immutable generation-bound `pdf-decompiler://` resource URIs.
 
-## Canonical format 2
+## Canonical format 3
 
-Canonical format version 2 and extraction revision 2 invalidate version 1 cache records. They add displayed-page geometry, structured internal link destinations, normalized annotation records, bounded visual signals, source-handle aware lifecycle data, and schema-enforced parser errors. Version 1 records are re-extracted because discarded geometry and provenance cannot be reconstructed safely.
+Canonical format version 3 and extraction revision 3 invalidate earlier canonical cache records. They add semantic heading, list, and code records, independent native or OCR origin, OCR source relationships, table dimensions and headers, displayed-page geometry, structured internal link destinations, normalized annotation records, bounded visual signals, source-handle aware lifecycle data, and schema-enforced parser errors. Earlier records are re-extracted because discarded geometry, semantics, and provenance cannot be reconstructed safely.
 
 Bounding boxes use PDF points after CropBox and page rotation, with a top-left origin, x increasing right, and y increasing down. Values are rounded to three decimals. A block box is the union of valid span boxes. Coordinates within 0.5 points of a page edge may be clamped; larger invalid boxes become null with `invalid_geometry`.
 
@@ -25,6 +25,8 @@ Reading order uses normalized geometry, line relationships, gutters, spanning re
 Internal links use named, explicit, or unresolved destination records. Parser-provided visible text is preferred. Geometry-derived anchor text requires meaningful overlap, line-aware ordering, duplicate removal, and deterministic conflict resolution. Raw PDF.js arrays and dictionaries are never canonical data.
 
 Visual classification reuses one bounded operator-list pass. Raster coverage is derived from image placements. Vector coverage is conservative and marked exact, approximate, or unknown. Shadings, nested forms, masks, clipping, and uncertain transforms may produce `visual_unknown`. Normal decomposition never renders a full page solely to classify it. A vector-only or unknown visual page receives a generation-bound deferred page-visual resource.
+
+Block roles are `heading`, `text`, `list`, or `code`. OCR origin is represented independently from role. Image-region OCR points to the canonical figure that produced it and is ordered directly after that figure. Page OCR participates in ordinary geometry-aware reading order. Invalid OCR source references are removed with a bounded warning instead of becoming dangling public references.
 
 ## Canonical identity contract
 
@@ -45,14 +47,16 @@ users/<owner-fingerprint>/
     assets/
     manifest.json
     leases/
-  derived/<documentId>/<extractionFingerprint>/
+  derived/<documentId>/<extractionFingerprint>/markdown/<serializerFingerprint>/
   indexes/<documentId>/<extractionFingerprint>/
   tombstones/
   locks/
   cursor-keys.json
 ```
 
-Writes use a staging path followed by atomic rename. Per-generation locks serialize writers. Manifests hash the source, canonical JSON, and extracted assets. Corruption deletes the affected generation and records a tombstone. Derived renders and semantic indexes are immutable adjuncts keyed by the exact generation.
+Writes use a staging path followed by atomic rename. Per-generation locks serialize writers. Manifests hash the source, canonical JSON, extracted assets, and derived Markdown. Corruption invalidates the affected entry. Derived renders, Markdown exports, BM25 indexes, and semantic indexes are immutable adjuncts keyed by the exact generation.
+
+Canonical, search-index, and Markdown invalidation are independent. A canonical change creates a new extraction generation and invalidates all derivatives. A BM25 index-version change rebuilds only BM25. A Markdown serializer change rebuilds only Markdown. The full-export serializer fingerprint contains only settings that can change complete export bytes or security behavior, so paged compact-table settings do not invalidate complete exports.
 
 Ephemeral and no-cache modes use owner-restricted process directories outside the persistent tree. See [Privacy](PRIVACY.md) for lifecycle details.
 
@@ -69,6 +73,12 @@ The three page modes are:
 - `fidelity`: includes all supported elements in reading order within the requested scope.
 
 Mode defaults are applied first, inclusion and exclusion overrides second, and hard budgets last.
+
+`pdf_get_pages` applies a deterministic round-robin allocator to the caller's normalized page order. Its authenticated cursor carries bounded per-page positions and argument fingerprints, never extracted text or source metadata. Conservative fragment estimates keep the candidate response bounded, then exact serialized wire measurement enforces the hard response limit. Elements, citations, resource references, and OCR relationships are indivisible fragments.
+
+Completion has three independent meanings. `documentComplete` means every PDF page has entered the canonical generation. `requestedScopeComplete` means every page or region requested by the operation has entered that generation. `resultComplete` means the current retrieval cursor chain has no remaining output fragments.
+
+Canonical JSON remains authoritative. Markdown is a deterministic projection selected with `pdf_get_pages.outputFormat = "markdown"` or read as a complete immutable resource. Paged Markdown appears once in `structuredContent.data.markdown`; the compact text block contains only a bounded summary, URI, and continuation instruction. Complete exports use full tables and fail with a stable Markdown error instead of truncating.
 
 ## MCP behavior
 

@@ -22,6 +22,13 @@ Local file access is denied by default until at least one allow root is configur
 | `PDF_DECOMPILER_SEMANTIC_ENABLED` | `false` | Enable semantic and hybrid ranking |
 | `PDF_DECOMPILER_SEMANTIC_ALLOW_DOWNLOAD` | `false` | Permit first-use download of the pinned model |
 | `PDF_DECOMPILER_CURSOR_TTL_MS` | `3600000` | Signed cursor validity period |
+| `PDF_DECOMPILER_MARKDOWN_MAX_BYTES` | `16777216` | Maximum complete Markdown export bytes; hard server maximum `67108864` |
+| `PDF_DECOMPILER_MARKDOWN_TIMEOUT_MS` | `30000` | Complete Markdown serialization deadline; hard server maximum `120000` |
+| `PDF_DECOMPILER_MARKDOWN_MAX_BUFFER_BYTES` | `8388608` | Maximum encoded serializer fragment buffer; hard server maximum `33554432` |
+| `PDF_DECOMPILER_MARKDOWN_MAX_ELEMENTS` | `100000` | Maximum elements in a complete export; hard server maximum `500000` |
+| `PDF_DECOMPILER_MARKDOWN_MAX_TABLE_ROWS` | `50000` | Maximum total table rows in a complete export; hard server maximum `250000` |
+| `PDF_DECOMPILER_MARKDOWN_MAX_TABLE_CELLS` | `500000` | Maximum total table cells in a complete export; hard server maximum `2000000` |
+| `PDF_DECOMPILER_MARKDOWN_MAX_CACHE_ENTRY_BYTES` | `16777216` | Maximum complete Markdown cache entry; hard server maximum `67108864` |
 | `PDF_DECOMPILER_TIMING` | `false` | Emit sanitized per-phase MCP and stdio timing to stderr |
 | `PDF_DECOMPILER_DEBUG` | `false` | Put detailed child diagnostics on stderr; never stdout |
 
@@ -38,5 +45,7 @@ node src/index.mjs
 ```
 
 Configuration affecting extraction changes `extractionFingerprint`. References retained from another generation are rejected instead of being resolved against the current model.
+
+Markdown limits do not change canonical extraction. Complete Markdown resources are separately identified by the extraction fingerprint, Markdown format version, serializer revision, and byte-affecting representation and escaping revisions. Paged compact-table settings do not affect complete-resource identity.
 
 `PDF_DECOMPILER_TIMING=1` records operation IDs and durations for request receipt, document lookup, handle release, lease release, cache deletion or process-local cleanup, serialization, response handoff, and stdio send completion. It never records paths, source labels, URLs, queries, or extracted text. The setting is diagnostic only and does not change extraction fingerprints.

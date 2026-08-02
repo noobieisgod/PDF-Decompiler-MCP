@@ -21,9 +21,10 @@ No old environment-variable alias is provided. Update configuration explicitly s
 | Old use case | New workflow |
 |---|---|
 | Extract all text | `pdf_open`, then `pdf_get_pages` in `text` mode with cursors, then `pdf_close` |
+| Produce Markdown | `pdf_get_pages` with `outputFormat: "markdown"`, or read the complete generation-bound Markdown resource when available |
 | Extract a page range | `pdf_open`, then `pdf_get_pages` with `pages` or `pageRanges` |
 | Find a fact | `pdf_open`, `pdf_search`, `pdf_get_element` or `pdf_get_pages` for evidence |
-| Extract tables | `pdf_search` with table terms or filters, then `pdf_get_element` for each table |
+| Extract tables | `pdf_search` with table terms or filters, then `pdf_get_element` with optional one-based inclusive `tableSelection` slices |
 | Return images | Search or retrieve figure records, then read their immutable resource URI |
 | Read a visually complex page | `pdf_render_page` after text and table retrieval |
 | Continue a large extraction | Call `pdf_open` again with its signed continuation cursor and exact generation |
@@ -123,6 +124,10 @@ Node.js 18 and 20 configurations must move to Node.js 22 or 24. Update clients t
 
 Every successful `pdf_open` also returns a distinct `sourceId`. Retain it until `pdf_close`, especially when the same bytes may be opened more than once. Closing without `sourceId` works only when exactly one handle is active for the generation.
 
-Canonical format version 2 changes link destinations from ambiguous strings to structured named, explicit, or unresolved records. Link text is string or null. Text, link, annotation, table-cell, raster, and OCR geometry use displayed-page point coordinates. Cache entries written with canonical format version 1 are not served and are re-extracted on the next open.
+Canonical format version 3 changes link destinations from ambiguous strings to structured named, explicit, or unresolved records. Link text is string or null. Text, link, annotation, table-cell, raster, and OCR geometry use displayed-page point coordinates. Blocks now carry semantic heading, list, or code structure independently from native or OCR origin. Image OCR references its canonical figure. Cache entries written with earlier canonical formats are not served and are re-extracted on the next open.
+
+`pdf_get_pages` supports structured output by default and deterministic Markdown projection on request. The common envelope is the sole owner of citations, warnings, diagnostics, omissions, budgets, completion, and continuation cursors. The Markdown string appears once in structured content, not again in the compact text fallback.
+
+Completion fields have distinct meanings. `documentComplete` describes the whole canonical generation. `requestedScopeComplete` describes extraction of the pages or regions requested by the operation. `resultComplete` describes exhaustion of the current retrieval cursor chain.
 
 Parser failures now use the enumerated `PDF_*` codes documented in [`docs/TOOLS.md`](docs/TOOLS.md). Clients must not depend on raw parser messages or create new codes from message text.

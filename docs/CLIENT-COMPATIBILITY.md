@@ -4,9 +4,9 @@ Launching a process is not sufficient for a compatibility claim. Validation cove
 
 | Client | Version | Date | Platform | Level | Evidence |
 |---|---|---|---|---|---|
-| Official MCP TypeScript client | 2.0.0 | 2026-08-02 | Windows build 26200.8655, Node 22.23.2 and 24.14.1 | Automated | Discovery, seven input and output schemas, structured content, compact fallback, errors, resources, bounded inline images, cursors, partial work, stdio, and shutdown pass the repository tests |
+| Official MCP TypeScript client | 2.0.0 | 2026-08-02 | Windows build 26200.8655, Node 22.23.1 and 24.14.1 | Automated | Discovery, seven input and output schemas, structured content, bounded Markdown fallback, errors, resources, bounded inline images, cursors, partial work, stdio, and shutdown pass the repository tests |
 | MCP Inspector CLI | 2.0.0 | 2026-08-01 | Windows build 26200.8655, Node 24.14.1 | Partial automated | JSON `tools/list` succeeds over stdio and exposes all seven input and output schemas; interactive image, resource, large-result, and shutdown UI behavior is untested |
-| 2025-era raw stdio client | Protocol 2025-06-18 | 2026-08-02 | Windows build 26200.8655, Node 22.23.2 and 24.14.1 | Automated | Capability-free initialization, protocol-clean stdout, and clean shutdown pass `test/server-smoke.test.mjs` |
+| 2025-era raw stdio client | Protocol 2025-06-18 | 2026-08-02 | Windows build 26200.8655, Node 22.23.1 and 24.14.1 | Automated | Capability-free initialization, protocol-clean stdout, and clean shutdown pass `test/server-smoke.test.mjs` |
 | Claude Desktop | Not recorded | 2026-08-01 | Not tested | Untested | No compatible version claim |
 | Codex CLI or desktop client | Desktop package 26.721.4979.0 present | 2026-08-01 | Windows build 26200.8655 | Untested | The packaged executable could not be invoked from this sandbox and no client configuration was changed |
 

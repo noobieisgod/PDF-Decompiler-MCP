@@ -1,6 +1,6 @@
 # PDF Decompiler MCP
 
-PDF Decompiler MCP is a local-first Model Context Protocol server for bounded, cited PDF decomposition and selective retrieval. It converts an exact PDF byte stream into a canonical model of pages, text blocks, tables and cells, figures, links, annotations, metadata, outlines, OCR output, and on-demand renders.
+PDF Decompiler MCP is a local-first Model Context Protocol server for bounded, cited PDF decomposition and selective retrieval. It converts an exact PDF byte stream into authoritative canonical JSON containing pages, semantic text blocks, tables and cells, figures, links, annotations, metadata, outlines, OCR relationships, and on-demand renders. Markdown is a deterministic projection of that model, not a separate extraction backend.
 
 Version 3.0.0 is implemented in this source tree but has not been published. Package publication, release creation, and the final npm name check require separate authorization.
 
@@ -32,8 +32,8 @@ The server uses stdio. Protocol messages are written to stdout and diagnostics a
 | `pdf_open` | Validate, decompose, index, resume, or load an exact PDF generation. |
 | `pdf_document_info` | Report metadata, decomposition, diagnostics, cache state, leases, and resource lifetime. |
 | `pdf_search` | Search with deterministic BM25, optional semantic retrieval, or reciprocal-rank fusion. |
-| `pdf_get_pages` | Return selected cited elements in text, balanced, or fidelity mode under explicit budgets. |
-| `pdf_get_element` | Resolve one element only in its expected extraction generation. |
+| `pdf_get_pages` | Return selected cited elements as structured data or Markdown in text, balanced, or fidelity mode under explicit budgets. |
+| `pdf_get_element` | Resolve one element, including bounded table slices, only in its expected extraction generation. |
 | `pdf_render_page` | Render a bounded page or crop as PNG or JPEG, returned inline only by explicit request. |
 | `pdf_close` | Release an open document and optionally delete its persistent generation. |
 
@@ -51,11 +51,16 @@ Every successful tool result uses the same structured envelope:
   "diagnostics": null,
   "omissions": [],
   "budget": null,
+  "completion": {
+    "documentComplete": true,
+    "requestedScopeComplete": true,
+    "resultComplete": true
+  },
   "nextCursor": null
 }
 ```
 
-The server also returns a compact text fallback. Every returned element has a citation containing its document, extraction generation, page, element ID, and location when available. Generated schemas are in [`schemas/`](schemas/), and the complete contract is in [`docs/TOOLS.md`](docs/TOOLS.md).
+The server also returns a bounded compact text fallback. Every returned element has a citation containing its document, extraction generation, page, element ID, and location when available. The common envelope is the sole owner of citations, warnings, diagnostics, omissions, budget, completion, and continuation. Generated schemas are in [`schemas/`](schemas/), and the complete contract is in [`docs/TOOLS.md`](docs/TOOLS.md).
 
 The legacy `extract_pdf_content` tool has been removed and is not aliased. See [`MIGRATION.md`](MIGRATION.md) for side-by-side workflows, renamed settings, client examples, and cases that no longer have a one-call equivalent.
 
@@ -65,7 +70,7 @@ The legacy `extract_pdf_content` tool has been removed and is not aliased. See [
 
 Every element, citation, asset, render, canonical export, and `pdf-decompiler://` resource URI carries the extraction fingerprint. A reference from another generation returns a structured stale-reference error. Active cached generations are immutable and protected by leases during retrieval, rendering, rebuilds, deletion, and eviction.
 
-Canonical format version 2 and extraction revision 2 preserve displayed-page geometry and invalidate version 1 canonical cache entries. Public bboxes use PDF points after CropBox and rotation, with a top-left origin. Link text is string or null, internal destinations are structured, and annotation subtype, content, geometry, authorship, dates, color, flags, and reply provenance are retained where available. Reading-order and link-overlap thresholds are named internal heuristics, not public constants.
+Canonical format version 3 and extraction revision 3 preserve displayed-page geometry and invalidate earlier canonical cache entries. Public bboxes use PDF points after CropBox and rotation, with a top-left origin. Link text is string or null, internal destinations are structured, and annotation subtype, content, geometry, authorship, dates, color, flags, and reply provenance are retained where available. Blocks represent headings, text, ordered or unordered lists, and code independently from native or OCR origin. Image-region OCR references its canonical figure. Reading-order, table, and link-overlap thresholds are named internal heuristics, not public constants.
 
 Raster and vector content share one bounded PDF.js operator inspection. Vector bounds may be conservative and are labeled exact, approximate, or unknown. Meaningful vector-only pages are never blank. Uncertain visual pages emit `visual_unknown` and expose a deferred, budgeted, generation-bound render without eager full-page rendering during decomposition.
 
@@ -77,13 +82,19 @@ Malformed input returns one enumerated sanitized `PDF_*` parser code. Worker rej
 
 Hard limits apply to document bytes, page counts, page selection, wall-clock processing, subprocess output, response bytes, rendered pages, image dimensions, and decompressed output at page boundaries. Native memory enforcement is operating-system enforced through `prlimit` on supported Linux hosts. Windows and macOS monitor working set and terminate the child after a threshold violation, so they provide bounded best-effort enforcement rather than a false hard-memory guarantee. The enforcement class is returned in diagnostics.
 
-Result budgets cover estimated text tokens, response bytes, pages, text blocks, tables, figures, rendered pages, and image dimensions. Oversized results are omitted with diagnostics and a continuation cursor instead of exceeding the limit.
+Result budgets cover estimated text tokens, complete wire-response bytes, pages, text blocks, tables, figures, rendered pages, and image dimensions. Multi-page retrieval allocates space in deterministic round-robin order. It performs bounded fragment preflight followed by exact final serialization and deterministic reduction if required. Oversized items are omitted with diagnostics and a continuation cursor only when future progress remains.
 
-Cursors are versioned, base64url encoded, expire, and are authenticated with an HMAC key identified by `kid`. They bind the document, extraction generation, operation, normalized arguments, and search-query digest. Payloads contain no plaintext query, path, document metadata, or extracted content. Cursors are signed, not encrypted. Key rotation may retain the previous key deliberately or retire it and invalidate outstanding cursors.
+Cursors are versioned, base64url encoded, expire, and are authenticated with an HMAC key identified by `kid`. They bind the document, extraction generation, operation, normalized arguments, search-query digest, page order, fair-allocation positions, format, table detail, filters, budgets, and relevant serializer versions. Payloads contain no plaintext query, path, document metadata, Markdown bytes, or extracted content. Cursors are signed, not encrypted. Key rotation may retain the previous key deliberately or retire it and invalidate outstanding cursors.
+
+Completion fields are independent. `documentComplete` means every PDF page is canonical. `requestedScopeComplete` means the pages or regions requested by the operation are canonical. `resultComplete` means the current retrieval cursor chain has no remaining fragments. A fully extracted page with additional retrieval output therefore reports true, true, false.
 
 ## Retrieval
 
 BM25 full-text retrieval is local, deterministic, available offline, and indexes normalized element text, positions, metadata, and outline entries.
+
+`pdf_get_pages` defaults to structured output. With `outputFormat: "markdown"`, the full paged Markdown appears once in `structuredContent.data.markdown`; the text block contains only a bounded summary, resource URI, and continuation instructions. Tables may use compact previews. `pdf_get_element.tableSelection` uses one-based inclusive row and column ranges for bounded full-table retrieval, with optional repeated canonical header context across continuations.
+
+A complete-document Markdown resource is available for complete generations. It always uses full tables, is generated atomically, and is checksum verified before publication. Configurable hard bounds cover bytes, serialization time, working buffer, elements, table rows, table cells, and derived-cache entry size. Complete exports fail rather than truncate. Their serializer fingerprint contains only settings that affect full-export bytes or security, so a Markdown-only change does not repeat canonical extraction and compact preview tuning does not invalidate an unchanged full export.
 
 Semantic and hybrid retrieval are optional and disabled by default. The implementation pins the FP32 `onnx-community/all-MiniLM-L6-v2-ONNX` model, exact repository commit, ONNX and tokenizer files, checksums, 384-dimensional mean pooling, and L2 normalization. It does not claim q8 quantization. If the optional package, model files, download, or loading is unavailable, search returns BM25 results with a warning. Hybrid mode uses reciprocal-rank fusion with `k = 60`. See [`docs/SEMANTIC-MODEL.md`](docs/SEMANTIC-MODEL.md) for the immutable artifact manifest and licenses.
 
@@ -115,7 +126,7 @@ Persistent generations use atomic staging and replacement, hashes, corruption re
 
 Every successful `pdf_open` returns a distinct process-local `sourceId` and safe descriptor, even when byte-identical opens share canonical data. `pdf_close(sourceId)` releases only that handle. The final handle prevents new work, waits for existing operations, releases the generation lease, and then removes process-local state. Source descriptors never affect canonical identity, indexes, citations, resources, or cache keys.
 
-The cache can contain original PDFs, extracted text, images, renders, indexes, metadata, and embeddings. Review backup policy and enable full-disk encryption where document sensitivity requires it. [`docs/PRIVACY.md`](docs/PRIVACY.md) lists exactly what is stored, retention behavior, deletion semantics, and verification limits.
+The cache can contain original PDFs, extracted text, images, renders, Markdown exports, indexes, metadata, and embeddings. Review backup policy and enable full-disk encryption where document sensitivity requires it. [`docs/PRIVACY.md`](docs/PRIVACY.md) lists exactly what is stored, retention behavior, deletion semantics, and verification limits.
 
 ## Image delivery and resources
 
@@ -157,7 +168,7 @@ npm run benchmark
 npm run package:verify -- artifacts\package-verification
 ```
 
-Forty-one deterministic fixtures are generated from source with hashes, intended features, expected classifications, geometry requirements, warnings, errors, and licensing metadata. They contain no third-party document content. The ignored `Heavy Test One.pdf`, `Medium Test One.pdf`, and `Medium Test Two.pdf` files are optional local integration samples and are excluded from Git and package allowlists.
+Forty-four deterministic fixtures are generated from source with hashes, intended features, expected classifications, geometry requirements, warnings, errors, and licensing metadata. They contain no third-party document content. The ignored `Heavy Test One.pdf`, `Medium Test One.pdf`, and `Medium Test Two.pdf` files are optional local integration samples and are excluded from Git and package allowlists.
 
 CI requires Node.js 22 and 24 on Windows for extraction, geometry, security, cache, packaging, MCP, and available OCR validation. macOS, Linux, and remote Linux OCR jobs remain configured as best-effort coverage. Unexecuted platform-specific behavior is reported as unverified. Tests run only where the host supports drive casing, UNC paths, symlinks, junctions, ACLs, permission denial, process monitoring, and atomic filesystem semantics.
 

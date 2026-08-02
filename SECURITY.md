@@ -33,13 +33,15 @@ The configured memory threshold is never left unenforced. Diagnostics report the
 
 OCR, parsing, and rendering run outside the MCP server process. Temporary directories are owner restricted and removed in `finally` blocks. Errors returned to tools omit stacks, local paths, child stderr, and native diagnostics. Debug details go only to stderr when explicitly enabled. Stdout remains MCP protocol traffic.
 
+Markdown is generated only from canonical records. PDF-derived values are untrusted and receive context-specific escaping for paragraphs, headings, lists, tables, links, images, annotations, code blocks, HTML attributes, and serializer comments. Source text cannot inject raw HTML, forge canonical markers, or create arbitrary image syntax. External links permit only HTTP, HTTPS, and mailto without credentials. Local paths, UNC paths, protocol-relative URLs, `file:`, `data:`, and `javascript:` are not emitted.
+
 Malformed PDFs return only the enumerated parser codes and categories documented in [`docs/TOOLS.md`](docs/TOOLS.md). The worker installs top-level rejection and exception handlers, atomically writes one bounded result, and never writes protocol data to stdout. The parent distinguishes sanitized parser rejection, timeout, crash or signal, missing output, malformed output, and oversized output. Unknown parser failures map to `PDF_MALFORMED_UNKNOWN`.
 
 Vector inspection is bounded operator analysis, not a proof of exact painted coverage. Conservative bounds are labeled approximate. Shadings, forms, masks, clipping, and uncertain transforms may produce `visual_unknown`. Classification failure cannot remove independently valid text, links, annotations, or raster figures, and normal decomposition does not eagerly render a page to decide whether it is visual.
 
 ## Cursors
 
-Cursors are versioned base64url payloads authenticated with HMAC-SHA-256. They bind document ID, extraction fingerprint, operation, normalized argument digest, offset, issue time, expiry, and cursor-key ID. They do not contain plaintext queries, paths, metadata, or extracted content.
+Cursors are versioned base64url payloads authenticated with HMAC-SHA-256. They bind document ID, extraction fingerprint, operation, normalized argument digest, bounded continuation positions, issue time, expiry, and cursor-key ID. Fair-page cursors additionally bind normalized page order, per-page positions, round-robin position, format, table detail, filters, budgets, and serializer versions. They do not contain plaintext queries, paths, metadata, Markdown bytes, or extracted content.
 
 Cursors are signed, not encrypted. Their minimal routing fields are inspectable. Replay within the validity period is allowed and returns the same deterministic continuation. Changing the query, filters, budgets, operation, document, or generation rejects the cursor. Key rotation may retain old keys for a deliberate transition or retire them immediately. Unknown and retired key IDs are rejected.
 
