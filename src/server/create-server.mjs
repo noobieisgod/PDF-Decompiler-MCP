@@ -2,6 +2,7 @@ import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import pkg from '../../package.json' with { type: 'json' };
 import { timingComplete, timingContext, timingMark, timingSnapshot } from '../runtime/timing.mjs';
 import { PdfDecompilerError, publicError } from '../core/errors.mjs';
+import { estimatedTextTokens, resolveBudget } from '../runtime/budget.mjs';
 import {
     CloseSchema,
     DocumentInfoSchema,
@@ -14,6 +15,10 @@ import {
 } from './schemas.mjs';
 
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
+const BUDGETED_OPERATIONS = new Set(['pdf_search', 'pdf_get_pages', 'pdf_get_element', 'pdf_render_page']);
+const REDUCIBLE_OPERATIONS = new Set(['pdf_search', 'pdf_get_pages', 'pdf_get_element']);
+const PROTOCOL_WRAPPER_RESERVE_BYTES = 1024;
+const PROTOCOL_WRAPPER_RESERVE_TOKENS = estimatedTextTokens(' '.repeat(PROTOCOL_WRAPPER_RESERVE_BYTES));
 
 function envelope(operation, args, data) {
     const {
@@ -39,7 +44,7 @@ function envelope(operation, args, data) {
         omissions,
         budget,
         nextCursor,
-        completion: { ...completion, resultComplete: nextCursor === null },
+        completion,
     };
 }
 
@@ -58,7 +63,7 @@ function compactText(value) {
             resourceUris: data.resourceUris,
             completion: value.completion,
             nextCursor: value.nextCursor,
-            instruction: value.nextCursor ? 'Call pdf_get_pages again with nextCursor and unchanged arguments.' : 'Markdown retrieval is complete.',
+            instruction: value.nextCursor ? 'Call pdf_get_pages again with the document reference and nextCursor; selectors may be omitted.' : 'Markdown retrieval is complete.',
         }).slice(0, 2048);
     }
     const summary = {
@@ -76,7 +81,11 @@ function compactText(value) {
         omissionCount: value.omissions.length,
         nextCursor: value.nextCursor,
         completion: value.completion,
-        instruction: value.nextCursor ? `Call ${value.operation} again with nextCursor and unchanged arguments.` : undefined,
+        instruction: value.nextCursor ? value.operation === 'pdf_get_pages'
+            ? 'Call pdf_get_pages again with the document reference and nextCursor; selectors may be omitted.'
+            : value.operation === 'pdf_open'
+                ? 'Call pdf_open again with the returned document reference, sourceId, and nextCursor to continue extraction.'
+                : `Call ${value.operation} again with nextCursor and unchanged arguments.` : undefined,
     };
     return JSON.stringify(summary).slice(0, 2048);
 }
@@ -103,39 +112,59 @@ function publicAsset(asset) {
     return metadata;
 }
 
+function stabilizeResult(value, buildResult) {
+    for (let attempt = 0; attempt < 5; attempt += 1) {
+        const result = buildResult();
+        const serialized = JSON.stringify(result);
+        const measurement = {
+            responseBytes: Buffer.byteLength(serialized) + PROTOCOL_WRAPPER_RESERVE_BYTES,
+            estimatedTokens: estimatedTextTokens(serialized) + PROTOCOL_WRAPPER_RESERVE_TOKENS,
+        };
+        if (!value.budget?.usage) return { result, measurement };
+        if (value.budget.usage.responseBytes === measurement.responseBytes && value.budget.usage.estimatedTokens === measurement.estimatedTokens) return { result, measurement };
+        value.budget.usage.responseBytes = measurement.responseBytes;
+        value.budget.usage.estimatedTokens = measurement.estimatedTokens;
+    }
+    throw new PdfDecompilerError('response_budget_exceeded', 'The complete MCP response budget accounting did not stabilize. Reduce the requested scope.');
+}
+
 function toolHandler(operation, managerCall, { assetResult = false } = {}) {
     return async args => timingContext(operation, async () => {
         timingMark('request_receipt');
         try {
-            const requestedBytes = Math.min(args.budget?.responseBytes || 1_000_000, 4_000_000);
+            const requestedBudget = BUDGETED_OPERATIONS.has(operation) ? resolveBudget(args.budget) : null;
+            const requestedBytes = requestedBudget?.responseBytes ?? 1_000_000;
+            const requestedTokens = requestedBudget?.estimatedTokens ?? Infinity;
             let wireResponseBytes = requestedBytes;
+            let wireEstimatedTokens = requestedTokens;
+            let delivery = args.imageDelivery;
             for (let attempt = 0; attempt < 8; attempt += 1) {
-                const callArgs = attempt && operation === 'pdf_get_pages' ? { ...args, _wireResponseBytes: wireResponseBytes } : args;
+                const callArgs = REDUCIBLE_OPERATIONS.has(operation) ? { ...args, _wireResponseBytes: wireResponseBytes, _wireEstimatedTokens: wireEstimatedTokens } : args;
                 const raw = await managerCall(callArgs);
                 timingMark('manager_operation');
                 const data = assetResult ? publicAsset(raw) : raw;
                 const value = envelope(operation, args, data);
                 if (timingSnapshot()) value.diagnostics = { ...(value.diagnostics || {}), ...timingSnapshot() };
-                if (assetResult && args.imageDelivery === 'inline' && Buffer.byteLength(raw.data || '', 'base64') > requestedBytes) {
-                    value.warnings.push({ code: 'inline_image_omitted', message: 'The image exceeded the response-byte budget and was returned as a resource link.' });
+                if (assetResult && delivery === 'inline' && Buffer.byteLength(raw.data || '', 'base64') > requestedBytes) delivery = 'resource';
+                if (assetResult && args.imageDelivery === 'inline' && delivery !== 'inline') {
+                    value.warnings.push({ code: 'inline_image_omitted', message: 'The image exceeded the response budget and was returned as a resource link.' });
                 }
-                const result = {
-                    content: resultContent(value, assetResult ? raw : null, args.imageDelivery, requestedBytes),
+                const { result, measurement } = stabilizeResult(value, () => ({
+                    content: resultContent(value, assetResult ? raw : null, delivery, requestedBytes),
                     structuredContent: value,
-                };
-                let wireBytes = Buffer.byteLength(JSON.stringify(result)) + 1024;
-                if (value.budget?.usage) {
-                    value.budget.usage.responseBytes = wireBytes;
-                    value.budget.usage.estimatedTokens = Math.ceil(wireBytes / 4);
-                    wireBytes = Buffer.byteLength(JSON.stringify(result)) + 1024;
-                }
-                if (wireBytes <= requestedBytes) {
+                }));
+                if (measurement.responseBytes <= requestedBytes && measurement.estimatedTokens <= requestedTokens) {
                     timingMark('response_serialization');
                     timingComplete();
                     return result;
                 }
-                if (operation !== 'pdf_get_pages') throw new PdfDecompilerError('response_budget_exceeded', 'The complete MCP response exceeded the hard response budget. Reduce the requested scope or continue with a cursor.');
+                if (assetResult && delivery === 'inline') {
+                    delivery = 'resource';
+                    continue;
+                }
+                if (!REDUCIBLE_OPERATIONS.has(operation)) throw new PdfDecompilerError('response_budget_exceeded', 'The complete MCP response exceeded the hard response budget. Reduce the requested scope or continue with a cursor.');
                 wireResponseBytes = Math.floor(wireResponseBytes * 0.7);
+                wireEstimatedTokens = Math.floor(wireEstimatedTokens * 0.7);
             }
             throw new PdfDecompilerError('response_budget_exceeded', 'The complete MCP response exceeded the hard response budget after deterministic fragment reduction. Reduce the requested scope or continue with a cursor.');
         } catch (error) {

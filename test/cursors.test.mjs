@@ -33,15 +33,17 @@ test('cursor rejects tampering, expiry, and retired keys while deliberate rotati
     assert.throws(() => new CursorCodec({ activeKeyId: 'b', keys: { b: keyB }, now: () => 1000 }).decode(old, { documentId: doc, extractionFingerprint: generation, operation: 'pdf_search', argumentsValue: query }), { code: 'retired_cursor_key' });
 });
 
-test('cursor version 2 preserves bounded fair-page continuation state without sensitive payloads', () => {
+test('cursor version 3 preserves bounded restorable fair-page state without sensitive payloads', () => {
     const position = { offsets: [2, 1, 0], pageIndex: 2, table: { offset: 4 } };
     const argumentsValue = { pages: [3, 1, 2], outputFormat: 'markdown', tableDetail: 'compact', queryDigest: 'digest-only' };
-    const cursor = codec().encode({ documentId: doc, extractionFingerprint: generation, operation: 'pdf_get_pages', argumentsValue, position });
+    const cursor = codec().encode({ documentId: doc, extractionFingerprint: generation, operation: 'pdf_get_pages', argumentsValue, position, restorableArguments: argumentsValue });
     assert.ok(cursor.length <= 4096);
     const decodedPayload = JSON.parse(Buffer.from(cursor.split('.')[0], 'base64url').toString('utf8'));
-    assert.equal(decodedPayload.v, 2);
+    assert.equal(decodedPayload.v, 3);
+    assert.deepEqual(decodedPayload.r, argumentsValue);
     assert.ok(!JSON.stringify(decodedPayload).includes('secret text'));
     assert.deepEqual(codec().decode(cursor, { documentId: doc, extractionFingerprint: generation, operation: 'pdf_get_pages', argumentsValue }), position);
+    assert.deepEqual(codec().decode(cursor, { documentId: doc, extractionFingerprint: generation, operation: 'pdf_get_pages', restoreArguments: true }), { position, argumentsValue });
     assert.throws(() => codec().decode(cursor, { documentId: doc, extractionFingerprint: generation, operation: 'pdf_get_pages', argumentsValue: { ...argumentsValue, pages: [1, 2, 3] } }), { code: 'changed_cursor_arguments' });
     assert.throws(() => codec().decode(cursor, { documentId: doc, extractionFingerprint: generation, operation: 'pdf_get_pages', argumentsValue: { ...argumentsValue, tableDetail: 'full' } }), { code: 'changed_cursor_arguments' });
 });

@@ -264,7 +264,7 @@ export class DocumentManager {
             completion: {
                 documentComplete: completeDocument(state.model),
                 requestedScopeComplete: requestedPagesComplete(state.model, requestedPages),
-                resultComplete: nextCursor === null,
+                resultComplete: true,
             },
         };
     }
@@ -401,7 +401,13 @@ export class DocumentManager {
             operation: 'pdf_search',
             argumentsValue: cursorArguments,
         }) : 0;
-        const bounded = applyResultBudget(results, resolveBudget(args.budget), start);
+        const requestedBudget = resolveBudget(args.budget);
+        const selectionBudget = {
+            ...requestedBudget,
+            responseBytes: Math.min(requestedBudget.responseBytes, Math.floor((args._wireResponseBytes ?? requestedBudget.responseBytes) * 0.65)),
+            estimatedTokens: Math.min(requestedBudget.estimatedTokens, Math.floor((args._wireEstimatedTokens ?? requestedBudget.estimatedTokens) * 0.65)),
+        };
+        const bounded = applyResultBudget(results, selectionBudget, start);
         const nextCursor = bounded.nextOffset === null ? null : this.cursors.encode({ documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint, operation: 'pdf_search', argumentsValue: cursorArguments, position: bounded.nextOffset });
         const scopePages = args.pages?.length ? args.pages : Array.from({ length: state.model.totalPages }, (_, index) => index + 1);
         return {
@@ -411,7 +417,7 @@ export class DocumentManager {
             citations: dedupe(bounded.items.flatMap(result => result.citations || [result.citation])),
             warnings,
             omissions: bounded.omissions,
-            budget: { configured: resolveBudget(args.budget), usage: bounded.usage, estimators: { text: 'utf8_bytes_divided_by_4' } },
+            budget: { configured: requestedBudget, usage: bounded.usage, estimators: { text: 'utf8_bytes_divided_by_4' } },
             nextCursor,
             completion: { documentComplete: completeDocument(state.model), requestedScopeComplete: requestedPagesComplete(state.model, scopePages), resultComplete: nextCursor === null },
         };
@@ -420,53 +426,60 @@ export class DocumentManager {
 
     async getPages(args) {
         return this.withOperation(args.documentId, args.extractionFingerprint, async state => {
-        if ((args.pages || []).some(page => page > state.model.totalPages)) throw new PdfDecompilerError('page_unavailable', 'A requested page exceeds the document page count.');
-        const requestedPages = normalizePageOrder(args.pages, args.pageRanges, state.model.totalPages, state.model.pages.map(page => page.number));
+        const restored = args.cursor ? this.cursors.decode(args.cursor, {
+            documentId: state.model.documentId,
+            extractionFingerprint: state.model.extractionFingerprint,
+            operation: 'pdf_get_pages',
+            restoreArguments: true,
+        }) : null;
+        const restoredArguments = restored?.argumentsValue;
+        const pageInput = args.pages || (!args.pageRanges ? restoredArguments?.pages : null);
+        if ((pageInput || []).some(page => page > state.model.totalPages)) throw new PdfDecompilerError('page_unavailable', 'A requested page exceeds the document page count.');
+        const requestedPages = normalizePageOrder(pageInput, args.pageRanges, state.model.totalPages, state.model.pages.map(page => page.number));
         if (requestedPages.length > HARD_BUDGET.pages) throw new PdfDecompilerError('budget_exhausted', 'The requested page scope exceeds the hard page limit.');
         const requested = new Set(requestedPages);
         const scoped = sortElements(state.model.elements.filter(element => requested.has(element.page)));
         let elements = scoped;
-        const mode = args.mode || 'balanced';
-        const outputFormat = args.outputFormat || 'structured';
-        const tableDetail = args.tableDetail || (outputFormat === 'markdown' ? 'compact' : 'full');
+        const mode = args.mode || restoredArguments?.mode || 'balanced';
+        const outputFormat = args.outputFormat || restoredArguments?.outputFormat || 'structured';
+        const tableDetail = args.tableDetail || restoredArguments?.tableDetail || (outputFormat === 'markdown' ? 'compact' : 'full');
+        const includeElementTypes = args.includeElementTypes || restoredArguments?.includeElementTypes;
+        const excludeElementTypes = args.excludeElementTypes || restoredArguments?.excludeElementTypes;
         if (mode === 'text') elements = elements.filter(element => element.type !== 'figure');
         if (mode === 'balanced') elements = elements.filter(element => element.type !== 'figure' || element.caption);
-        if (args.includeElementTypes?.length) {
-            const include = new Set(args.includeElementTypes);
+        if (includeElementTypes?.length) {
+            const include = new Set(includeElementTypes);
             const selectedIds = new Set(elements.map(element => element.id));
             elements = sortElements([...elements, ...scoped.filter(element => include.has(element.type) && !selectedIds.has(element.id))]);
         }
-        if (args.excludeElementTypes?.length) {
-            const exclude = new Set(args.excludeElementTypes);
+        if (excludeElementTypes?.length) {
+            const exclude = new Set(excludeElementTypes);
             elements = elements.filter(element => !exclude.has(element.type));
         }
-        const resolvedBudget = resolveBudget(args.budget);
+        const requestedBudget = args.budget || restoredArguments?.requestedBudget;
+        const resolvedBudget = resolveBudget(requestedBudget);
         const cursorArguments = {
             pages: requestedPages,
             mode,
             outputFormat,
             tableDetail,
-            includeElementTypes: args.includeElementTypes || null,
-            excludeElementTypes: args.excludeElementTypes || null,
-            requestedBudget: args.budget || null,
+            includeElementTypes: includeElementTypes || null,
+            excludeElementTypes: excludeElementTypes || null,
+            requestedBudget: resolvedBudget,
             hardBudgetFingerprint: fingerprint(HARD_BUDGET),
             canonicalFormatVersion: state.model.canonicalFormatVersion,
             extractionRevision: state.model.extractionRevision,
             markdownFormatVersion: outputFormat === 'markdown' ? MARKDOWN_FORMAT_VERSION : null,
             markdownSerializerRevision: outputFormat === 'markdown' ? MARKDOWN_SERIALIZER_REVISION : null,
         };
-        const position = args.cursor ? this.cursors.decode(args.cursor, {
-            documentId: state.model.documentId,
-            extractionFingerprint: state.model.extractionFingerprint,
-            operation: 'pdf_get_pages',
-            argumentsValue: cursorArguments,
-        }) : { offsets: requestedPages.map(() => 0), pageIndex: 0 };
+        if (restoredArguments && fingerprint(restoredArguments) !== fingerprint(cursorArguments)) throw new PdfDecompilerError('changed_cursor_arguments', 'The cursor arguments have changed.');
+        const position = restored?.position || { offsets: requestedPages.map(() => 0), pageIndex: 0 };
         const pageItems = requestedPages.map(page => ({ page, items: elements.filter(element => element.page === page) }));
         const wireResponseBytes = Math.min(resolvedBudget.responseBytes, args._wireResponseBytes ?? resolvedBudget.responseBytes);
         const preCapBudget = {
             ...resolvedBudget,
             responseBytes: Math.floor(wireResponseBytes * 0.65),
-            estimatedTokens: Math.min(resolvedBudget.estimatedTokens, Math.floor(wireResponseBytes / 4 * 0.75)),
+            estimatedTokens: Math.min(resolvedBudget.estimatedTokens, Math.floor((args._wireEstimatedTokens ?? resolvedBudget.estimatedTokens) * 0.65)),
         };
         const bounded = applyFairPageBudget(pageItems, preCapBudget, position, element => {
             const value = element.type === 'table' && tableDetail === 'compact' ? compactTable(element) : element;
@@ -494,6 +507,7 @@ export class DocumentManager {
             operation: 'pdf_get_pages',
             argumentsValue: cursorArguments,
             position: bounded.nextPosition,
+            restorableArguments: cursorArguments,
         });
         const resourceUris = dedupe([
             ...(completeDocument(state.model) ? [markdownResourceUri(state.model)] : []),
@@ -562,8 +576,8 @@ export class DocumentManager {
                 }) : { offset: 0 };
                 const boundedBudget = {
                     ...resolvedBudget,
-                    responseBytes: Math.floor(resolvedBudget.responseBytes * 0.65),
-                    estimatedTokens: Math.floor(resolvedBudget.estimatedTokens * 0.75),
+                    responseBytes: Math.floor(Math.min(resolvedBudget.responseBytes, args._wireResponseBytes ?? resolvedBudget.responseBytes) * 0.65),
+                    estimatedTokens: Math.floor(Math.min(resolvedBudget.estimatedTokens, args._wireEstimatedTokens ?? resolvedBudget.estimatedTokens) * 0.65),
                 };
                 const selected = selectTable(element, args.tableSelection || {}, boundedBudget, cursorPosition.offset || 0);
                 const nextCursor = selected.nextOffset === null ? null : this.cursors.encode({

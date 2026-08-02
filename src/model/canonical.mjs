@@ -2,8 +2,8 @@ import { fingerprint, sha256 } from '../core/crypto.mjs';
 import { normalizeBBox, unionBBoxes } from './geometry.mjs';
 
 export const SCHEMA_VERSION = '3.0.0';
-export const CANONICAL_FORMAT_VERSION = 3;
-export const EXTRACTION_REVISION = 3;
+export const CANONICAL_FORMAT_VERSION = 4;
+export const EXTRACTION_REVISION = 4;
 
 function cleanText(text) {
     return String(text ?? '').replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
@@ -129,12 +129,22 @@ export function buildCanonicalModel(pdfBytes, raw, config, dependencyFingerprint
                 annotationCount: rawPage.annotations?.length || 0,
                 warnings: [],
             },
-            ocr: {
-                attempted: Boolean(rawPage.ocrAttempted),
-                accepted: Boolean(rawPage.ocrAccepted),
-                reason: rawPage.ocrReason || null,
-            },
-            diagnostics: { annotationWidgetCount: rawPage.annotationWidgetCount || 0 },
+            ocr: (() => {
+                const regions = rawPage.ocrRegions || { attempted: Number(Boolean(rawPage.ocrAttempted)), accepted: Number(Boolean(rawPage.ocrAccepted)), rejected: 0 };
+                const status = regions.attempted === 0 ? 'not_attempted'
+                    : regions.accepted === 0 ? 'rejected'
+                        : regions.rejected > 0 ? 'partial' : 'accepted';
+                return {
+                    attempted: regions.attempted > 0,
+                    accepted: regions.accepted > 0,
+                    status,
+                    attemptedRegions: regions.attempted,
+                    acceptedRegions: regions.accepted,
+                    rejectedRegions: regions.rejected,
+                    reason: rawPage.ocrReason || null,
+                };
+            })(),
+            diagnostics: { annotationWidgetCount: rawPage.annotationWidgetCount || 0, ocr: (rawPage.ocrDiagnostics || []).slice(0, 32) },
             warnings: pageWarnings,
             elementIds: [],
         };
@@ -178,7 +188,7 @@ export function buildCanonicalModel(pdfBytes, raw, config, dependencyFingerprint
                 listContinuation: role === 'list' ? Boolean(block.listContinuation) : false,
                 codeLanguage: role === 'code' && /^[a-z0-9_+-]{1,32}$/i.test(block.codeLanguage || '') ? block.codeLanguage.toLowerCase() : null,
                 ocrSource,
-                extractionMethod: rawPage.extractionMode,
+                extractionMethod: textSource,
                 confidence: textSource === 'ocr' ? 0.7 : 1,
                 citation: citation(documentId, generation, rawPage.page, id, bbox),
                 ...elementFingerprints('block', rawPage.page, bbox, text),

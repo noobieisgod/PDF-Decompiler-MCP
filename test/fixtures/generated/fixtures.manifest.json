@@ -924,6 +924,70 @@
         "tableShape": null
       }
     },
+    "table-textual-wrapped.pdf": {
+      "sha256": "963a02242f5e30d0df754c3d9a912b49152ae1ec30f9350b0d7405f742bdfbd1",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "table textual wrapped",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "table"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "table"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "tableShape": {
+          "minimumRows": 4,
+          "columns": 3,
+          "tableCount": 1
+        }
+      }
+    },
+    "table-wide-spread.pdf": {
+      "sha256": "051acc41f7e70d592d2af0002c569ec92024a69aa3aacf523974c54f53d22b85",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "table wide spread",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "table"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "table"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "tableShape": {
+          "rows": 4,
+          "columns": 3,
+          "tableCount": 2
+        }
+      }
+    },
     "tables-bordered.pdf": {
       "sha256": "33a0c41550053856ee62e541bf76ffe923ff2339834c488eba61c6dac7465f4c",
       "generated": true,
@@ -1081,6 +1145,52 @@
         },
         "warnings": [],
         "errorCode": null
+      }
+    },
+    "toc-sectioned-columns.pdf": {
+      "sha256": "dc817a3fbd969416bfb5438b89e7ba209721cc675e9f500cbd59182ce0a78058",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "toc sectioned columns",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null,
+        "readingOrder": [
+          "3.1",
+          "3.2",
+          "3.3",
+          "3.4",
+          "3.5",
+          "3.6",
+          "3.7",
+          "3.8",
+          "4.1",
+          "4.2",
+          "4.3",
+          "4.4",
+          "4.5",
+          "4.6",
+          "4.7",
+          "4.8"
+        ]
       }
     },
     "truncated.pdf": {

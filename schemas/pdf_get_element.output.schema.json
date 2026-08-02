@@ -416,7 +416,11 @@
                       ]
                     },
                     "extractionMethod": {
-                      "type": "string"
+                      "type": "string",
+                      "enum": [
+                        "native",
+                        "ocr"
+                      ]
                     },
                     "confidence": {
                       "type": "number",

@@ -69,7 +69,7 @@ export const BlockElementSchema = z.object({
     listContinuation: z.boolean(),
     codeLanguage: z.string().regex(/^[a-z0-9_+-]{1,32}$/).nullable(),
     ocrSource: OcrSourceSchema.nullable(),
-    extractionMethod: z.string(),
+    extractionMethod: z.enum(['native', 'ocr']),
     confidence: z.number().min(0).max(1),
 }).superRefine((block, context) => {
     if ((block.role === 'heading') !== (block.headingLevel !== null)) context.addIssue({ code: 'custom', message: 'headingLevel must be set only for headings' });
@@ -288,8 +288,15 @@ const PageSchema = z.object({
     routingMode: z.enum(['native_text', 'native_table_heavy', 'native_visual_regions', 'filtered', 'page_visual_fallback', 'page_visual_unknown', 'page_ocr', 'page_error']),
     contentClass: z.enum(['text', 'structured_text', 'dense_text', 'table', 'visual', 'scan_like', 'ocr_text', 'blank', 'error']),
     visualType: z.enum(['none', 'raster', 'vector', 'mixed', 'unknown']), visualSignals: PageVisualSignalsSchema,
-    ocr: z.object({ attempted: z.boolean(), accepted: z.boolean(), reason: z.string().nullable() }),
-    diagnostics: z.object({ annotationWidgetCount: z.number().int().nonnegative() }), warnings: z.array(WarningSchema), elementIds: z.array(z.string()),
+    ocr: z.object({
+        attempted: z.boolean(), accepted: z.boolean(), status: z.enum(['not_attempted', 'accepted', 'partial', 'rejected']),
+        attemptedRegions: z.number().int().nonnegative(), acceptedRegions: z.number().int().nonnegative(), rejectedRegions: z.number().int().nonnegative(),
+        reason: z.string().nullable(),
+    }),
+    diagnostics: z.object({
+        annotationWidgetCount: z.number().int().nonnegative(),
+        ocr: z.array(z.object({ code: z.literal('ocr_low_sample_count'), sampleCount: z.number().int().min(1).max(2) })).max(32),
+    }), warnings: z.array(WarningSchema), elementIds: z.array(z.string()),
 });
 
 const OpenDataSchema = z.object({
@@ -298,7 +305,7 @@ const OpenDataSchema = z.object({
     cacheHit: z.boolean(), cache: CacheStatusSchema,
 });
 const DocumentInfoDataSchema = z.object({
-    schemaVersion: z.literal('3.0.0'), canonicalFormatVersion: z.literal(3), extractionRevision: z.literal(3),
+    schemaVersion: z.literal('3.0.0'), canonicalFormatVersion: z.literal(4), extractionRevision: z.literal(4),
     documentId: DocumentIdSchema, pdfSha256: z.string().regex(/^[a-f0-9]{64}$/), extractionFingerprint: ExtractionFingerprintSchema,
     dependencyFingerprint: z.string().regex(/^[a-f0-9]{64}$/), metadata: MetadataSchema, outline: z.array(OutlineItemSchema),
     totalPages: z.number().int().positive(), processedPages: z.number().int().nonnegative(), partial: PartialSchema.nullable(),

@@ -88,6 +88,36 @@ function tablePage({ bordered = true, merged = false } = {}) {
     return { texts, graphics };
 }
 
+function textualTablePage() {
+    return { texts: [
+        { x: 72, y: 700, size: 13, text: 'Datatype' }, { x: 240, y: 700, size: 13, text: 'Purpose' }, { x: 430, y: 700, size: 13, text: 'Examples' },
+        { x: 72, y: 670, text: 'integer' }, { x: 240, y: 670, text: 'Holds a whole value' }, { x: 430, y: 670, text: 'one two five' },
+        { x: 72, y: 640, text: 'decimal' }, { x: 240, y: 640, text: 'Holds a precise value' }, { x: 430, y: 640, text: 'two point five' },
+        { x: 240, y: 625, text: 'with a wrapped explanation' }, { x: 430, y: 625, text: 'another example' },
+        { x: 72, y: 595, text: 'string' }, { x: 240, y: 595, text: 'Holds readable text' }, { x: 430, y: 595, text: 'sample words' },
+    ] };
+}
+
+function wideSpreadTablesPage() {
+    const table = offset => [
+        ['Item', 'Current', 'Prior'], ['Revenue', '120', '100'], ['Cost', '80', '70'], ['Income', '40', '30'],
+    ].flatMap((row, rowIndex) => row.map((text, columnIndex) => ({ x: offset + [0, 190, 300][columnIndex], y: 690 - rowIndex * 30, text })));
+    return { width: 1200, texts: [...table(60), ...table(660)] };
+}
+
+function sectionedColumnsPage() {
+    const rows = (prefix, y, leftStart, rightStart) => [0, 1, 2, 3].flatMap(index => [
+        { x: 90, y: y - index * 18, size: 10, text: `${prefix}.${index + 1} Left section ${leftStart + index}` },
+        { x: 330, y: y - index * 18, size: 10, text: `${prefix}.${index + 5} Right section ${rightStart + index}` },
+    ]);
+    return { texts: [
+        { x: 90, y: 730, size: 18, text: 'THIRD SECTION' }, { x: 540, y: 730, size: 10, text: '040' },
+        ...rows('3', 700, 1, 5),
+        { x: 90, y: 590, size: 18, text: 'FOURTH SECTION' }, { x: 540, y: 590, size: 10, text: '068' },
+        ...rows('4', 560, 1, 5),
+    ] };
+}
+
 const FONT = {
     A:'011101000110001111111000110001',B:'11110100011000111110100011000111110',C:'01111100001000010000100001000001111',D:'11110100011000110001100011000111110',E:'11111100001000011110100001000011111',F:'11111100001000011110100001000010000',G:'01111100001000010111100011000101111',H:'10001100011000111111100011000110001',I:'11111001000010000100001000010011111',J:'00111000100001000010100100100101100',K:'10001100101010011000101001001010001',L:'10000100001000010000100001000011111',M:'10001110111010110101100011000110001',N:'10001110011010110011100011000110001',O:'01110100011000110001100011000101110',P:'11110100011000111110100001000010000',Q:'01110100011000110001101011001001101',R:'11110100011000111110101001001010001',S:'01111100001000001110000010000111110',T:'11111001000010000100001000010000100',U:'10001100011000110001100011000101110',V:'10001100011000110001100010101000100',W:'10001100011000110101101011010101010',X:'10001100010101000100010101000110001',Y:'10001100010101000100001000010000100',Z:'11111000010001000100010001000011111',
 };
@@ -268,6 +298,8 @@ function expectedFixtureBehavior(name) {
         pageClassifications: name.includes('negative') ? ['text'] : ['table'], visualTypes: ['none', 'vector'],
         elementTypes: name.includes('negative') ? ['block'] : ['table'], tableShape: name.includes('negative') ? null : { rows: 3, columns: 3 },
     });
+    if (name === 'table-textual-wrapped.pdf') result.tableShape = { minimumRows: 4, columns: 3, tableCount: 1 };
+    if (name === 'table-wide-spread.pdf') result.tableShape = { rows: 4, columns: 3, tableCount: 2 };
     if (name.startsWith('links')) Object.assign(result, {
         pageClassifications: ['text'], elementTypes: ['block', 'link'], warnings: ['incomplete_or_ambiguous_links_when_present'],
         linkTargets: name === 'links.pdf' ? ['external_url', 'named_destination', 'explicit_destination', 'target_only'] : ['adjacent', 'overlapping', 'multiline'],
@@ -277,6 +309,7 @@ function expectedFixtureBehavior(name) {
     if (name === 'raster-photograph.pdf') result.bboxSamples = [{ type: 'figure', x: 90, y: 212, width: 430, height: 300 }];
     if (name === 'rotated.pdf') result.rotations = [90, 270];
     if (name === 'multi-column.pdf') result.readingOrder = ['LAYOUT HEADING', 'Left column', 'Right column', 'Spanning footer'];
+    if (name === 'toc-sectioned-columns.pdf') result.readingOrder = ['3.1', '3.2', '3.3', '3.4', '3.5', '3.6', '3.7', '3.8', '4.1', '4.2', '4.3', '4.4', '4.5', '4.6', '4.7', '4.8'];
     return result;
 }
 
@@ -288,6 +321,9 @@ export async function generateFixtures(directory = fileURLToPath(new URL('./gene
         'tables-borderless.pdf': buildFixturePdf([tablePage({ bordered: false })]),
         'table-merged-header.pdf': buildFixturePdf([tablePage({ bordered: true, merged: true })]),
         'table-negative-controls.pdf': buildFixturePdf([{ texts: [{x:72,y:700,text:'Chapter one ........ 10'},{x:72,y:670,text:'const value = 100'},{x:72,y:640,text:'Ordinary aligned prose'}] }]),
+        'table-textual-wrapped.pdf': buildFixturePdf([textualTablePage()]),
+        'table-wide-spread.pdf': buildFixturePdf([wideSpreadTablesPage()]),
+        'toc-sectioned-columns.pdf': buildFixturePdf([sectionedColumnsPage()]),
         ...visualFixtures(),
         ...linkFixtures(),
         'annotations.pdf': annotationFixture(),

@@ -51,6 +51,8 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
     let ocrAttempted = false;
     let ocrAccepted = false;
     let ocrReason = null;
+    const ocrRegions = { attempted: 0, accepted: 0, rejected: 0 };
+    const ocrDiagnostics = [];
     let cachedFullCanvas = null;
 
     if (extractionMode === 'filtered') {
@@ -70,6 +72,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
             ocrReason = 'Tesseract not available on PATH';
         } else {
             ocrAttempted = true;
+            ocrRegions.attempted += 1;
             try {
                 cachedFullCanvas = await renderFullPageCanvas();
                 const ocrCanvas = scaleCanvas(cachedFullCanvas, Math.min(maxImageDim ?? 1400, 1400));
@@ -85,15 +88,20 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                     routingMode = 'page_ocr';
                     contentClass = 'ocr_text';
                     ocrAccepted = true;
+                    ocrRegions.accepted += 1;
+                    ocrDiagnostics.push(...(ocrResult.diagnostics || []));
                     pageText = ocrResult.text;
                     rawTextBlocks = ocrResult.blocks || [];
                 } else {
+                    ocrRegions.rejected += 1;
+                    ocrDiagnostics.push(...(ocrResult.diagnostics || []));
                     extractionMode = 'visual_fallback';
                     routingMode = 'page_visual_fallback';
                     contentClass = 'scan_like';
                     ocrReason = ocrResult.reason;
                 }
             } catch (err) {
+                ocrRegions.rejected += 1;
                 extractionMode = 'visual_fallback';
                 routingMode = 'page_visual_fallback';
                 contentClass = 'scan_like';
@@ -258,6 +266,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                     const image = rawImages[rawImageIndex];
                     if (image.regionKind === 'decorative' || !image.bbox) continue;
                     ocrAttempted = true;
+                    ocrRegions.attempted += 1;
                     let ocrBytes = image.data ? Buffer.from(image.data, 'base64') : null;
                     let pixelWidth = Math.max(1, image.width || image.bbox.width);
                     let pixelHeight = Math.max(1, image.height || image.bbox.height);
@@ -281,6 +290,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                             image.fallbackReason = null;
                             image.extractionMethod = 'ocr_region_crop';
                         } catch {
+                            ocrRegions.rejected += 1;
                             extractionWarnings.push({ code: 'image_ocr_unavailable' });
                             continue;
                         }
@@ -299,10 +309,13 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                             bbox: image.bbox,
                         },
                     });
+                    ocrDiagnostics.push(...(result.diagnostics || []));
                     if (!result.ok) {
+                        ocrRegions.rejected += 1;
                         extractionWarnings.push({ code: 'image_ocr_rejected', message: result.reason });
                         continue;
                     }
+                    ocrRegions.accepted += 1;
                     const duplicate = block => {
                         const normalized = normalizeLooseText(block.text);
                         return nativeBlocks.some(native => normalizeLooseText(native.text) === normalized && normalized.length > 0
@@ -344,6 +357,9 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
     }
 
     pdfjsPage.cleanup();
+    ocrAccepted = ocrRegions.accepted > 0;
+    if (ocrRegions.attempted > 0 && ocrRegions.accepted === 0 && !ocrReason) ocrReason = 'All OCR regions were rejected';
+    if (ocrRegions.accepted > 0 && ocrRegions.rejected > 0) ocrReason = 'Some OCR regions were rejected';
     return {
         page: pageNum,
         extractionMode,
@@ -354,6 +370,8 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
         ocrAttempted,
         ocrAccepted,
         ocrReason,
+        ocrRegions,
+        ocrDiagnostics: ocrDiagnostics.slice(0, 32),
         text: pageText,
         textBlocks: rawTextBlocks,
         annotations,
@@ -382,6 +400,8 @@ export function buildPageErrorResult(pageData) {
         ocrAttempted: false,
         ocrAccepted: false,
         ocrReason: null,
+        ocrRegions: { attempted: 0, accepted: 0, rejected: 0 },
+        ocrDiagnostics: [],
         text: '(Page extraction failed)',
         textBlocks: [],
         annotations: [],

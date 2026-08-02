@@ -192,9 +192,19 @@ export function extractStructTables(structTree, mcidMap) {
     return tables;
 }
 
-export function detectTables(items, viewport = null) {
+export function detectTables(items, viewport = null, allowSpreadPartition = true) {
     if (items.length === 0) {
         return { tables: [], nonTableItems: [] };
+    }
+    if (allowSpreadPartition && viewport?.width > viewport?.height * 1.25) {
+        const middle = viewport.width / 2;
+        const leftItems = items.filter(item => item.x + (item.w || 0) / 2 < middle);
+        const rightItems = items.filter(item => item.x + (item.w || 0) / 2 >= middle);
+        const left = detectTables(leftItems, viewport, false);
+        const right = detectTables(rightItems, viewport, false);
+        if (left.tables.length && right.tables.length) {
+            return { tables: [...left.tables, ...right.tables], nonTableItems: [...left.nonTableItems, ...right.nonTableItems] };
+        }
     }
     const rowInfos = groupItemsIntoRows(items).map(buildRowInfo).filter(row => row.items.length > 0);
     if (rowInfos.length < TABLE_MIN_ROWS) {
@@ -246,17 +256,17 @@ export function detectTables(items, viewport = null) {
         const grid = mappedRows.map(row => row.cells);
         const populated = grid.flat().map(value => value.trim()).filter(Boolean);
         const numericRatio = populated.filter(value => /(?:^|\s)[+-]?(?:\d+[.,]?\d*|\d*\.\d+)%?(?:\s|$)/.test(value)).length / Math.max(1, populated.length);
-        const averageLength = populated.reduce((sum, value) => sum + value.length, 0) / Math.max(1, populated.length);
+        const alignedRowRatio = mappedRows.filter(row => row.filledColumns.size >= 2).length / Math.max(1, mappedRows.length);
         const tocRowRatio = grid.filter(row => {
             const joined = row.join(' ').replace(/\s+/g, ' ').trim();
             return /^\d+(?:\.\d+)+\b/.test(joined) && /(?:^|\s)\d{2,3}\s*$/.test(joined);
         }).length / Math.max(1, grid.length);
         const tocCellRatio = populated.filter(value => /\b\d+(?:\.\d+)+\b/.test(value)).length / Math.max(1, populated.length);
-        const tableItemBoxes = tableRows.flatMap(row => row.items).map(item => item.bbox).filter(Boolean);
-        const tableBox = unionBBoxes(tableItemBoxes, viewport?.width, viewport?.height);
+        const bulletRowRatio = grid.filter(row => /^[\s●•\u0007*-]/.test(row.find(value => value.trim()) || '')).length / Math.max(1, grid.length);
+        const tableBox = unionBBoxes(tableRows.flatMap(row => row.items).map(item => item.bbox).filter(Boolean), viewport?.width, viewport?.height);
         const crossesSpread = viewport?.width > viewport?.height * 1.25 && tableBox
             && tableBox.x < viewport.width / 2 && tableBox.x + tableBox.width > viewport.width / 2;
-        if ((numericRatio < 0.2 && averageLength > 12) || tocRowRatio >= 0.5 || (crossesSpread && (tocRowRatio >= 0.2 || tocCellRatio >= 0.15))) {
+        if (alignedRowRatio < TABLE_MIN_COV || (tableAnchors.length === 2 && numericRatio < 0.2) || tocRowRatio >= 0.5 || tocCellRatio >= 0.5 || bulletRowRatio >= 0.5 || crossesSpread) {
             nonTableItems.push(...tableRows.flatMap(row => row.items));
             rowIndex = nextIndex;
             continue;

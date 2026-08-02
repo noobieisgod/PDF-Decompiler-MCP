@@ -14,9 +14,9 @@ PDF Decompiler MCP 3.0.0 is a native ESM, local stdio server. It uses the offici
 8. Tools retrieve bounded subsets. Signed cursors continue results without placing queries or paths in their payload.
 9. Assets, renders, and derived Markdown use immutable generation-bound `pdf-decompiler://` resource URIs.
 
-## Canonical format 3
+## Canonical format 4
 
-Canonical format version 3 and extraction revision 3 invalidate earlier canonical cache records. They add semantic heading, list, and code records, independent native or OCR origin, OCR source relationships, table dimensions and headers, displayed-page geometry, structured internal link destinations, normalized annotation records, bounded visual signals, source-handle aware lifecycle data, and schema-enforced parser errors. Earlier records are re-extracted because discarded geometry, semantics, and provenance cannot be reconstructed safely.
+Canonical format version 4 and extraction revision 4 invalidate earlier canonical cache records. They retain the format 3 geometry and semantic records while adding consistent OCR region status, word-confidence gating, corrected OCR provenance, section-bounded column order, and corrected textual and spread-table extraction. Earlier records are re-extracted because rejected OCR, table boundaries, and reading order cannot be reconstructed safely.
 
 Bounding boxes use PDF points after CropBox and page rotation, with a top-left origin, x increasing right, and y increasing down. Values are rounded to three decimals. A block box is the union of valid span boxes. Coordinates within 0.5 points of a page edge may be clamped; larger invalid boxes become null with `invalid_geometry`.
 
@@ -26,7 +26,7 @@ Internal links use named, explicit, or unresolved destination records. Parser-pr
 
 Visual classification reuses one bounded operator-list pass. Raster coverage is derived from image placements. Vector coverage is conservative and marked exact, approximate, or unknown. Shadings, nested forms, masks, clipping, and uncertain transforms may produce `visual_unknown`. Normal decomposition never renders a full page solely to classify it. A vector-only or unknown visual page receives a generation-bound deferred page-visual resource.
 
-Block roles are `heading`, `text`, `list`, or `code`. OCR origin is represented independently from role. Image-region OCR points to the canonical figure that produced it and is ordered directly after that figure. Page OCR participates in ordinary geometry-aware reading order. Invalid OCR source references are removed with a bounded warning instead of becoming dangling public references.
+Block roles are `heading`, `text`, `list`, or `code`. OCR origin is represented independently from role and always uses `extractionMethod: "ocr"`. Image-region OCR points to the canonical figure that produced it and is ordered directly after that figure. Page OCR reports region counts and accepted, partial, rejected, or not-attempted status. Invalid OCR source references and rejected OCR are removed instead of becoming dangling or searchable public records.
 
 ## Canonical identity contract
 
@@ -74,7 +74,7 @@ The three page modes are:
 
 Mode defaults are applied first, inclusion and exclusion overrides second, and hard budgets last.
 
-`pdf_get_pages` applies a deterministic round-robin allocator to the caller's normalized page order. Its authenticated cursor carries bounded per-page positions and argument fingerprints, never extracted text or source metadata. Conservative fragment estimates keep the candidate response bounded, then exact serialized wire measurement enforces the hard response limit. Elements, citations, resource references, and OCR relationships are indivisible fragments.
+`pdf_get_pages` applies a deterministic round-robin allocator to the caller's normalized page order. Its authenticated version 3 cursor carries bounded per-page positions and safe normalized selectors, never extracted text or source metadata. Conservative fragment estimates keep the candidate response bounded, then exact serialized UTF-8 bytes and estimated tokens are enforced independently. Elements, citations, resource references, and OCR relationships are indivisible fragments.
 
 Completion has three independent meanings. `documentComplete` means every PDF page has entered the canonical generation. `requestedScopeComplete` means every page or region requested by the operation has entered that generation. `resultComplete` means the current retrieval cursor chain has no remaining output fragments.
 

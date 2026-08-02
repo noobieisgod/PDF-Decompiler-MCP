@@ -12,7 +12,7 @@ Completion fields are independent:
 
 ## `pdf_open`
 
-Accepts a local path or HTTPS source, optional `sourceLabel`, page intervals, OCR policy, refresh flag, image dimension, or partial-decomposition cursor. Every successful call returns a distinct random process-local `sourceId` and safe descriptor, even when identical bytes share the same document ID and canonical generation. A selected subset remains a partial generation until continuation processes every missing page. Continuation requires its original source handle.
+Accepts a local path or HTTPS source, optional `sourceLabel`, page intervals, OCR policy, refresh flag, image dimension, or partial-decomposition cursor. Every successful call returns a distinct random process-local `sourceId` and safe descriptor, even when identical bytes share the same document ID and canonical generation. A selected subset remains a partial generation until continuation processes every missing page. Continuation requires its original source handle. An extraction cursor does not make the open response retrieval-incomplete, so `resultComplete` remains true.
 
 ## `pdf_document_info`
 
@@ -28,7 +28,7 @@ Accepts page numbers or ranges, `text`, `balanced`, or `fidelity` mode, element 
 
 Structured data contains only `outputFormat`, `pages`, `elements`, and resource URIs. Markdown data contains only `outputFormat`, `markdownFormatVersion`, `pages`, `markdown`, and resource URIs. Citations, warnings, diagnostics, omissions, budget, completion, and cursor remain in the common envelope.
 
-Paged retrieval uses deterministic fair allocation across the normalized requested-page order. Cursors bind page order, per-page positions, current round-robin position, format, table detail, filters, inclusion overrides, budgets, extraction generation, and serializer versions. Permanently oversized items produce an omission and are advanced. The server never returns a zero-progress cursor.
+Paged retrieval uses deterministic fair allocation across the normalized requested-page order. Version 3 cursors authenticate and restore page order, per-page positions, current round-robin position, format, table detail, filters, inclusion overrides, budgets, extraction generation, and serializer versions. A continuation may therefore supply only the document reference and cursor. Explicit repeated selectors must match. Permanently oversized items produce an omission and are advanced. The server never returns a zero-progress cursor.
 
 The full Markdown string appears once in structured content. Compact text contains a bounded summary, resource URI, and continuation instructions. Complete wire-size accounting includes the protocol wrapper, envelope, structured Markdown, compact text, citations, warnings, omissions, and resource links.
 

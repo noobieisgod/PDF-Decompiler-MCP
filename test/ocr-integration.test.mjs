@@ -12,11 +12,14 @@ test('required OCR policy is exercised when Tesseract integration is enabled', {
     const opened = await manager.open({ source: path.join(root, 'scan-readable.pdf'), ocrPolicy: 'required' });
     const state = await manager.requireState(opened.documentId, opened.extractionFingerprint);
     assert.equal(state.model.pages[0].ocr.accepted, true);
+    assert.equal(state.model.pages[0].ocr.status, 'accepted');
+    assert.equal(state.model.pages[0].ocr.attemptedRegions, state.model.pages[0].ocr.acceptedRegions + state.model.pages[0].ocr.rejectedRegions);
     const blocks = state.model.elements.filter(element => element.type === 'block' && element.textSource === 'ocr');
     assert.ok(blocks.length > 0);
     assert.match(blocks.map(block => block.text).join(' '), /OCR SUCCESS TEXT/i);
     assert.ok(blocks.every(block => block.bbox && block.bbox.width > 0 && block.bbox.height > 0));
     assert.ok(blocks.every(block => block.citation.bbox));
+    assert.ok(blocks.every(block => block.extractionMethod === 'ocr'));
 });
 
 test('required OCR links image-region text to its canonical figure without duplicating native text', { skip: process.env.PDF_DECOMPILER_TEST_OCR !== '1' }, async t => {
@@ -29,6 +32,9 @@ test('required OCR links image-region text to its canonical figure without dupli
         const state = await manager.requireState(opened.documentId, opened.extractionFingerprint);
         const ocrBlocks = state.model.elements.filter(element => element.type === 'block' && element.textSource === 'ocr' && element.ocrSource?.scope === 'image');
         assert.ok(ocrBlocks.length > 0, name);
+        assert.equal(state.model.pages[0].ocr.attemptedRegions, state.model.pages[0].ocr.acceptedRegions + state.model.pages[0].ocr.rejectedRegions);
+        assert.ok(['accepted', 'partial'].includes(state.model.pages[0].ocr.status));
+        assert.ok(ocrBlocks.every(block => block.extractionMethod === 'ocr'));
         assert.ok(ocrBlocks.every(block => state.indexes.elements.get(block.ocrSource.figureId)?.type === 'figure'));
         assert.ok(ocrBlocks.every(block => block.bbox && block.ocrSource.bbox));
         const markdown = await manager.getPages({ ...opened, pages: [1], outputFormat: 'markdown', mode: 'fidelity' });

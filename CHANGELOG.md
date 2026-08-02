@@ -15,6 +15,7 @@
 - Added one-based inclusive table slicing with resumable signed cursors, repeated header context, and canonical cell identity.
 - Added fair round-robin multi-page budgeting, grouped BM25 context, warning deduplication, and separate document, requested-scope, and retrieval completion fields.
 - Fixed required OCR for native pages containing raster text, table-of-contents false positives, and prototype-named BM25 terms.
+- Corrected textual and spread-table recovery, section-bounded column order, OCR confidence and provenance, cursor-only page continuation, open completion semantics, and independent complete-response byte and token enforcement under canonical format 4.
 - Added enumerated sanitized parser failures and top-level worker containment for rejection, exception, timeout, crash, missing output, malformed output, and stderr noise.
 - Added independent process-local source handles, safe descriptors, operation leases, atomic active-generation deletion checks, and opt-in sanitized close timing.
 - Made Windows Node.js 22 and 24 the blocking CI matrix; macOS, Linux, and remote Linux OCR jobs remain best-effort until executed successfully.

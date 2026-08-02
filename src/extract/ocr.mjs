@@ -6,10 +6,13 @@ import { spawn, spawnSync } from 'child_process';
 import {
     OCR_MAX_REPEATED_RATIO,
     OCR_MAX_CORRUPTED_LINE_RATIO,
+    OCR_MAX_LOW_CONFIDENCE_RATIO,
     OCR_MAX_SHORT_TOKEN_RATIO,
     OCR_MAX_SYMBOL_HEAVY_RATIO,
+    OCR_LOW_CONFIDENCE_THRESHOLD,
     OCR_MIN_ALNUM_RATIO,
     OCR_MIN_CHARS,
+    OCR_MIN_MEAN_CONFIDENCE,
     OCR_MIN_WORDLIKE_RATIO,
     OCR_MIN_WORDS,
 } from '../config/constants.mjs';
@@ -91,6 +94,27 @@ export function ocrTextLooksGood(text) {
     return { ok: true, reason: null };
 }
 
+export function ocrConfidenceStats(words) {
+    const confidences = (words || []).filter(word => word?.level === 5
+        && String(word.text || '').normalize('NFKC').trim()
+        && Number.isFinite(word.confidence)
+        && word.confidence >= 0 && word.confidence <= 100)
+        .map(word => word.confidence);
+    if (!confidences.length) return { ok: false, sampleCount: 0, mean: null, lowConfidenceRatio: null, diagnostics: [], reason: 'OCR output had no valid word confidence samples' };
+    const mean = confidences.reduce((sum, confidence) => sum + confidence, 0) / confidences.length;
+    const lowConfidenceRatio = confidences.filter(confidence => confidence < OCR_LOW_CONFIDENCE_THRESHOLD).length / confidences.length;
+    const diagnostics = confidences.length <= 2 ? [{ code: 'ocr_low_sample_count', sampleCount: confidences.length }] : [];
+    const ok = mean >= OCR_MIN_MEAN_CONFIDENCE && lowConfidenceRatio <= OCR_MAX_LOW_CONFIDENCE_RATIO;
+    return {
+        ok,
+        sampleCount: confidences.length,
+        mean,
+        lowConfidenceRatio,
+        diagnostics,
+        reason: ok ? null : mean < OCR_MIN_MEAN_CONFIDENCE ? 'OCR word confidence was too low' : 'OCR output contained too many low-confidence words',
+    };
+}
+
 function parseTsv(value, geometry) {
     const rows = value.replace(/\r\n/g, '\n').split('\n').slice(1).map(line => line.split('\t')).filter(columns => columns.length >= 12 && columns[0] === '5' && columns[11]?.trim());
     const xScale = geometry?.pageWidth && geometry?.pixelWidth ? geometry.pageWidth / geometry.pixelWidth : 1;
@@ -98,6 +122,7 @@ function parseTsv(value, geometry) {
     const xOffset = geometry?.x || 0;
     const yOffset = geometry?.y || 0;
     const words = rows.map((columns, sourceIndex) => ({
+        level: Number(columns[0]),
         text: columns[11].trim(),
         block: columns[2],
         paragraph: columns[3],
@@ -167,10 +192,12 @@ export async function runTesseractOcr(pngBytes, pageNum, geometry = null) {
         const parsed = parseTsv(tsv, geometry);
         const cleaned = parsed.text.trim();
         const quality = ocrTextLooksGood(cleaned);
-        if (!quality.ok) {
-            return { ok: false, text: cleaned, blocks: parsed.blocks, words: parsed.words, reason: quality.reason };
+        const confidence = ocrConfidenceStats(parsed.words);
+        const diagnostics = confidence.diagnostics;
+        if (!quality.ok || !confidence.ok) {
+            return { ok: false, text: cleaned, blocks: parsed.blocks, words: parsed.words, reason: quality.ok ? confidence.reason : quality.reason, diagnostics, confidence };
         }
-        return { ok: true, text: cleaned, blocks: parsed.blocks, words: parsed.words, reason: null };
+        return { ok: true, text: cleaned, blocks: parsed.blocks, words: parsed.words, reason: null, diagnostics, confidence };
     } catch {
         return { ok: false, text: '', reason: 'OCR process failed' };
     } finally {

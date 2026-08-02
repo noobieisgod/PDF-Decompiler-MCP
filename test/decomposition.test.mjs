@@ -18,7 +18,7 @@ test('no-cache mode supports the complete multi-call API and cleans only the clo
     const second = await manager.open({ source: secondPath });
     assert.equal(first.completion.documentComplete, false);
     assert.equal(first.completion.requestedScopeComplete, true);
-    assert.equal(first.completion.resultComplete, false);
+    assert.equal(first.completion.resultComplete, true);
     assert.ok(first.nextCursor);
     assert.equal((await manager.search({ ...first, query: 'Alpha' })).results[0].page, 1);
     assert.equal((await manager.getPages({ ...first, pages: [1] })).elements[0].citation.extractionFingerprint, first.extractionFingerprint);
@@ -81,11 +81,12 @@ test('refresh replaces only an inactive persistent generation', async t => {
 });
 
 test('requestedScopeComplete reports extraction state while resultComplete reports retrieval pagination', async t => {
-    const root = path.resolve('test/fixtures/generated');
-    const { config } = await temporaryConfig(t, { cacheMode: 'none', allowRoots: [root] });
+    const { root, config } = await temporaryConfig(t, { cacheMode: 'none' });
+    const source = path.join(root, 'pagination.pdf');
+    await fs.writeFile(source, buildSyntheticPdf({ pages: ['First bounded page', 'Second bounded page'] }));
     const manager = await new DocumentManager(config).init();
     t.after(() => manager.close());
-    const opened = await manager.open({ source: path.join(root, 'oversized-content.pdf') });
+    const opened = await manager.open({ source });
     const page = await manager.getPages({ ...opened, pages: [1, 2], budget: { textBlocks: 1, responseBytes: 100_000 } });
     assert.equal(page.completion.documentComplete, true);
     assert.equal(page.completion.requestedScopeComplete, true);
@@ -95,6 +96,8 @@ test('requestedScopeComplete reports extraction state while resultComplete repor
     await assert.rejects(manager.getPages({ ...opened, pages: [1, 2], outputFormat: 'markdown', budget: { textBlocks: 1, responseBytes: 100_000 }, cursor: page.nextCursor }), { code: 'changed_cursor_arguments' });
     const ids = page.elements.map(element => element.id);
     let cursor = page.nextCursor;
+    const cursorOnly = await manager.getPages({ documentId: opened.documentId, extractionFingerprint: opened.extractionFingerprint, cursor });
+    assert.ok(cursorOnly.elements.length || cursorOnly.omissions.length);
     while (cursor) {
         const next = await manager.getPages({ ...opened, pages: [1, 2], budget: { textBlocks: 1, responseBytes: 100_000 }, cursor });
         assert.ok(next.elements.length || next.omissions.length);

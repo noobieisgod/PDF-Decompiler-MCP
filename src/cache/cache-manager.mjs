@@ -157,7 +157,7 @@ export class CacheManager {
 
     async generationExists(documentId, generation) {
         const manifest = await fs.readFile(path.join(this.generationPath(documentId, generation), 'manifest.json'), 'utf8').then(JSON.parse, () => null);
-        return manifest?.version === 3 && manifest?.canonicalFormatVersion === 3;
+        return manifest?.version === 4 && manifest?.canonicalFormatVersion === 4;
     }
 
     lockPath(documentId, generation) {
@@ -192,7 +192,7 @@ export class CacheManager {
         const destination = this.generationPath(model.documentId, model.extractionFingerprint);
         return this.withLock(model.documentId, model.extractionFingerprint, async () => {
             const existingManifest = await fs.readFile(path.join(destination, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
-            if (existingManifest?.version === 3 && existingManifest?.canonicalFormatVersion === model.canonicalFormatVersion) return destination;
+            if (existingManifest?.version === 4 && existingManifest?.canonicalFormatVersion === model.canonicalFormatVersion) return destination;
             if (existingManifest) await fs.rm(destination, { recursive: true, force: true });
             const staging = `${destination}.staging-${process.pid}-${randomUUID()}`;
             await fs.mkdir(path.join(staging, 'assets'), { recursive: true, mode: 0o700 });
@@ -209,7 +209,7 @@ export class CacheManager {
             if (bm25) await atomicJson(path.join(staging, 'bm25.json'), bm25);
             if (semantic) await atomicJson(path.join(staging, 'semantic.json'), semantic);
             const manifest = {
-                version: 3,
+                version: 4,
                 canonicalFormatVersion: model.canonicalFormatVersion,
                 extractionRevision: model.extractionRevision,
                 documentId: model.documentId,
@@ -240,7 +240,7 @@ export class CacheManager {
     async loadGeneration(documentId, generation) {
         const root = this.generationPath(documentId, generation);
         const manifest = await fs.readFile(path.join(root, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
-        if (!manifest || manifest.version !== 3 || manifest.canonicalFormatVersion !== 3
+        if (!manifest || manifest.version !== 4 || manifest.canonicalFormatVersion !== 4
             || manifest.documentId !== documentId || manifest.extractionFingerprint !== generation) return null;
         const canonicalBytes = await fs.readFile(path.join(root, 'canonical.json')).catch(() => null);
         if (!canonicalBytes || sha256(canonicalBytes) !== manifest.files['canonical.json']) {
@@ -248,7 +248,7 @@ export class CacheManager {
             return null;
         }
         const model = JSON.parse(canonicalBytes.toString('utf8'));
-        if (model.canonicalFormatVersion !== 3 || model.extractionRevision !== 3) return null;
+        if (model.canonicalFormatVersion !== 4 || model.extractionRevision !== 4) return null;
         for (const asset of model.assets) {
             if (!asset.filename) {
                 asset.data = null;

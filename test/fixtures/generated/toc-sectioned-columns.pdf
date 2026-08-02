@@ -1,0 +1,52 @@
+%PDF-1.7
+% synthetic licensing-safe fixture
+1 0 obj
+<< /Type /Catalog /Pages 2 0 R >>
+endobj
+2 0 obj
+<< /Type /Pages /Kids [4 0 R] /Count 1 >>
+endobj
+3 0 obj
+<< /Type /Font /Subtype /Type1 /BaseFont /Helvetica >>
+endobj
+4 0 obj
+<< /Type /Page /Parent 2 0 R /MediaBox [0 0 612 792] /Rotate 0 /Resources << /Font << /F1 3 0 R >> >> /Contents 5 0 R >>
+endobj
+5 0 obj
+<< /Length 978 >>
+stream
+BT /F1 18 Tf 90 730 Td (THIRD SECTION) Tj ET
+BT /F1 10 Tf 540 730 Td (040) Tj ET
+BT /F1 10 Tf 90 700 Td (3.1 Left section 1) Tj ET
+BT /F1 10 Tf 330 700 Td (3.5 Right section 5) Tj ET
+BT /F1 10 Tf 90 682 Td (3.2 Left section 2) Tj ET
+BT /F1 10 Tf 330 682 Td (3.6 Right section 6) Tj ET
+BT /F1 10 Tf 90 664 Td (3.3 Left section 3) Tj ET
+BT /F1 10 Tf 330 664 Td (3.7 Right section 7) Tj ET
+BT /F1 10 Tf 90 646 Td (3.4 Left section 4) Tj ET
+BT /F1 10 Tf 330 646 Td (3.8 Right section 8) Tj ET
+BT /F1 18 Tf 90 590 Td (FOURTH SECTION) Tj ET
+BT /F1 10 Tf 540 590 Td (068) Tj ET
+BT /F1 10 Tf 90 560 Td (4.1 Left section 1) Tj ET
+BT /F1 10 Tf 330 560 Td (4.5 Right section 5) Tj ET
+BT /F1 10 Tf 90 542 Td (4.2 Left section 2) Tj ET
+BT /F1 10 Tf 330 542 Td (4.6 Right section 6) Tj ET
+BT /F1 10 Tf 90 524 Td (4.3 Left section 3) Tj ET
+BT /F1 10 Tf 330 524 Td (4.7 Right section 7) Tj ET
+BT /F1 10 Tf 90 506 Td (4.4 Left section 4) Tj ET
+BT /F1 10 Tf 330 506 Td (4.8 Right section 8) Tj ET
+endstream
+endobj
+xref
+0 6
+0000000000 65535 f 
+0000000044 00000 n 
+0000000093 00000 n 
+0000000150 00000 n 
+0000000220 00000 n 
+0000000356 00000 n 
+trailer
+<< /Size 6 /Root 1 0 R >>
+startxref
+1385
+%%EOF

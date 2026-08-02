@@ -95,7 +95,7 @@ test('paged Markdown stays within the complete wire budget and makes determinist
     assert.equal(new Set(markers).size, markers.length);
 });
 
-test('exact wire overflow rebuilds paged Markdown with fewer progress fragments', async t => {
+test('wire preflight bounds paged Markdown before exact serialization', async t => {
     let calls = 0;
     const manager = {
         getPages: async args => {
@@ -132,6 +132,6 @@ test('exact wire overflow rebuilds paged Markdown with fewer progress fragments'
     assert.equal(response.structuredContent.data.markdown, 'bounded');
     assert.equal(response.structuredContent.completion.requestedScopeComplete, true);
     assert.equal(response.structuredContent.completion.resultComplete, false);
-    assert.ok(calls > 1);
+    assert.equal(calls, 1);
     assert.ok(Buffer.byteLength(JSON.stringify(response)) + 1024 <= 8000);
 });

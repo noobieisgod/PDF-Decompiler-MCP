@@ -112,18 +112,39 @@ function attachMarginNumbers(blocks, regionX, regionWidth) {
     return result;
 }
 
-function orderBlocks(blocks, viewport, regionX = 0) {
+function orderBlocks(blocks, viewport, regionX = 0, allowSectionBands = true, allowSpreadPartition = true) {
     const width = viewport?.width || 0;
     const height = viewport?.height || 0;
-    if (width > height * 1.25 && blocks.length >= 6) {
+    if (allowSpreadPartition && width > height * 1.25 && blocks.length >= 6) {
         const split = regionX + width / 2;
         const left = blocks.filter(block => !block.bbox || block.bbox.x + block.bbox.width / 2 < split);
         const right = blocks.filter(block => block.bbox && block.bbox.x + block.bbox.width / 2 >= split);
         if (left.length >= 3 && right.length >= 3) {
-            const leftResult = orderBlocks(left, { width: width / 2, height }, regionX);
-            const rightResult = orderBlocks(right, { width: width / 2, height }, split);
+            const leftResult = orderBlocks(left, { width: width / 2, height }, regionX, allowSectionBands, false);
+            const rightResult = orderBlocks(right, { width: width / 2, height }, split, allowSectionBands, false);
             return { blocks: [...leftResult.blocks, ...rightResult.blocks], warnings: [...new Map([...leftResult.warnings, ...rightResult.warnings].map(warning => [JSON.stringify(warning), warning])).values()] };
         }
+    }
+    const sectionDividers = allowSectionBands ? blocks.filter(block => block._sectionDivider && block.bbox).sort((a, b) => a.bbox.y - b.bbox.y || a.sourceIndex - b.sourceIndex) : [];
+    if (sectionDividers.length) {
+        const output = [];
+        const warnings = [];
+        let startY = -Infinity;
+        for (const divider of sectionDividers) {
+            const band = blocks.filter(block => !sectionDividers.includes(block) && block.bbox && block.bbox.y >= startY && block.bbox.y < divider.bbox.y);
+            const bandHeight = band.length ? Math.max(1, Math.max(...band.map(block => block.bbox.y + block.bbox.height)) - Math.min(...band.map(block => block.bbox.y))) : height;
+            const ordered = orderBlocks(band, { ...viewport, height: bandHeight }, regionX, false, false);
+            output.push(...ordered.blocks, divider);
+            warnings.push(...ordered.warnings);
+            startY = divider.bbox.y;
+        }
+        const remainder = blocks.filter(block => !sectionDividers.includes(block) && (!block.bbox || block.bbox.y >= startY));
+        const boundedRemainder = remainder.filter(block => block.bbox);
+        const remainderHeight = boundedRemainder.length ? Math.max(1, Math.max(...boundedRemainder.map(block => block.bbox.y + block.bbox.height)) - Math.min(...boundedRemainder.map(block => block.bbox.y))) : height;
+        const ordered = orderBlocks(remainder, { ...viewport, height: remainderHeight }, regionX, false, false);
+        output.push(...ordered.blocks);
+        warnings.push(...ordered.warnings);
+        return { blocks: output, warnings: [...new Map(warnings.map(warning => [JSON.stringify(warning), warning])).values()] };
     }
     const spanning = blocks.filter(block => block.role === 'heading' || (width > 0 && block.bbox?.width / width >= SPANNING_BLOCK_WIDTH_RATIO));
     const candidates = blocks.filter(block => !spanning.includes(block) && block.bbox);
@@ -205,9 +226,22 @@ export function buildTextBlocks(items, viewport = null) {
             ...classifyBlock(current.text),
         });
     }
-    const headingSizes = [...new Set(blocks.filter(block => block.role === 'heading').map(block => block.fontSize))].sort((a, b) => b - a);
-    const listStarts = [...new Set(blocks.filter(block => block.role === 'list').map(block => Math.round(block.x)))].sort((a, b) => a - b);
-    const semanticBlocks = blocks.map(({ bboxes, fontSize, ...block }) => ({
+    const fontSizes = blocks.map(block => block.fontSize).filter(Number.isFinite).sort((a, b) => a - b);
+    const medianFontSize = fontSizes.length ? fontSizes[Math.floor(fontSizes.length / 2)] : 12;
+    const classifiedBlocks = blocks.map(block => {
+        const pageLabel = /^\d{2,4}$/.test(block.text.trim());
+        const sectionDivider = block.text.trim().length <= 80 && block.bbox?.width >= 80
+            && block.fontSize >= medianFontSize * 1.5 && block.bbox.height <= medianFontSize * 3;
+        return {
+            ...block,
+            role: sectionDivider ? 'heading' : pageLabel ? 'text' : block.role,
+            roleConfidence: sectionDivider ? 0.9 : pageLabel ? 0.95 : block.roleConfidence,
+            _sectionDivider: sectionDivider,
+        };
+    });
+    const headingSizes = [...new Set(classifiedBlocks.filter(block => block.role === 'heading').map(block => block.fontSize))].sort((a, b) => b - a);
+    const listStarts = [...new Set(classifiedBlocks.filter(block => block.role === 'list').map(block => Math.round(block.x)))].sort((a, b) => a - b);
+    const semanticBlocks = classifiedBlocks.map(({ bboxes, fontSize, ...block }) => ({
         ...block,
         ...(block.role === 'heading' ? { headingLevel: Math.min(6, headingSizes.indexOf(fontSize) + 1) } : {}),
         ...(block.role === 'list' ? { listLevel: Math.min(32, Math.max(0, listStarts.indexOf(Math.round(block.x)))), listItemId: `raw-list-item:${block.sourceIndex}` } : {}),
@@ -236,7 +270,8 @@ export function buildTextBlocks(items, viewport = null) {
             activeList = null;
         }
     }
-    return orderBlocks(semanticBlocks, viewport);
+    const ordered = orderBlocks(semanticBlocks, viewport);
+    return { ...ordered, blocks: ordered.blocks.map(({ _sectionDivider, ...block }) => block) };
 }
 
 export function normalizeLooseText(text) {

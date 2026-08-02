@@ -43,11 +43,11 @@
             },
             "canonicalFormatVersion": {
               "type": "number",
-              "const": 3
+              "const": 4
             },
             "extractionRevision": {
               "type": "number",
-              "const": 3
+              "const": 4
             },
             "documentId": {
               "type": "string",
@@ -352,6 +352,30 @@
                       "accepted": {
                         "type": "boolean"
                       },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "not_attempted",
+                          "accepted",
+                          "partial",
+                          "rejected"
+                        ]
+                      },
+                      "attemptedRegions": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "acceptedRegions": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "rejectedRegions": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
                       "reason": {
                         "anyOf": [
                           {
@@ -366,6 +390,10 @@
                     "required": [
                       "attempted",
                       "accepted",
+                      "status",
+                      "attemptedRegions",
+                      "acceptedRegions",
+                      "rejectedRegions",
                       "reason"
                     ],
                     "additionalProperties": false
@@ -377,10 +405,34 @@
                         "type": "integer",
                         "minimum": 0,
                         "maximum": 9007199254740991
+                      },
+                      "ocr": {
+                        "maxItems": 32,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "code": {
+                              "type": "string",
+                              "const": "ocr_low_sample_count"
+                            },
+                            "sampleCount": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 2
+                            }
+                          },
+                          "required": [
+                            "code",
+                            "sampleCount"
+                          ],
+                          "additionalProperties": false
+                        }
                       }
                     },
                     "required": [
-                      "annotationWidgetCount"
+                      "annotationWidgetCount",
+                      "ocr"
                     ],
                     "additionalProperties": false
                   },
