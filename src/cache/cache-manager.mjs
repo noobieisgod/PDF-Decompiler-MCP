@@ -136,13 +136,28 @@ export class CacheManager {
         return path.join(this.root, 'derived', documentId, generation, `${sha256(id)}.json`);
     }
 
+    markdownPaths(documentId, generation, serializerFingerprint) {
+        const root = path.join(this.root, 'derived', documentId, generation, 'markdown');
+        return {
+            root,
+            content: path.join(root, `${serializerFingerprint}.md`),
+            manifest: path.join(root, `${serializerFingerprint}.json`),
+        };
+    }
+
+    async createDerivedTempFile(documentId, generation) {
+        const root = path.join(this.root, 'staging', documentId, generation);
+        await fs.mkdir(root, { recursive: true, mode: 0o700 });
+        return path.join(root, `${process.pid}-${randomUUID()}.tmp`);
+    }
+
     semanticPath(documentId, generation) {
         return path.join(this.root, 'indexes', documentId, generation, 'semantic.json');
     }
 
     async generationExists(documentId, generation) {
         const manifest = await fs.readFile(path.join(this.generationPath(documentId, generation), 'manifest.json'), 'utf8').then(JSON.parse, () => null);
-        return manifest?.version === 2 && manifest?.canonicalFormatVersion === 2;
+        return manifest?.version === 3 && manifest?.canonicalFormatVersion === 3;
     }
 
     lockPath(documentId, generation) {
@@ -177,7 +192,7 @@ export class CacheManager {
         const destination = this.generationPath(model.documentId, model.extractionFingerprint);
         return this.withLock(model.documentId, model.extractionFingerprint, async () => {
             const existingManifest = await fs.readFile(path.join(destination, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
-            if (existingManifest?.version === 2 && existingManifest?.canonicalFormatVersion === model.canonicalFormatVersion) return destination;
+            if (existingManifest?.version === 3 && existingManifest?.canonicalFormatVersion === model.canonicalFormatVersion) return destination;
             if (existingManifest) await fs.rm(destination, { recursive: true, force: true });
             const staging = `${destination}.staging-${process.pid}-${randomUUID()}`;
             await fs.mkdir(path.join(staging, 'assets'), { recursive: true, mode: 0o700 });
@@ -194,7 +209,7 @@ export class CacheManager {
             if (bm25) await atomicJson(path.join(staging, 'bm25.json'), bm25);
             if (semantic) await atomicJson(path.join(staging, 'semantic.json'), semantic);
             const manifest = {
-                version: 2,
+                version: 3,
                 canonicalFormatVersion: model.canonicalFormatVersion,
                 extractionRevision: model.extractionRevision,
                 documentId: model.documentId,
@@ -225,7 +240,7 @@ export class CacheManager {
     async loadGeneration(documentId, generation) {
         const root = this.generationPath(documentId, generation);
         const manifest = await fs.readFile(path.join(root, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
-        if (!manifest || manifest.version !== 2 || manifest.canonicalFormatVersion !== 2
+        if (!manifest || manifest.version !== 3 || manifest.canonicalFormatVersion !== 3
             || manifest.documentId !== documentId || manifest.extractionFingerprint !== generation) return null;
         const canonicalBytes = await fs.readFile(path.join(root, 'canonical.json')).catch(() => null);
         if (!canonicalBytes || sha256(canonicalBytes) !== manifest.files['canonical.json']) {
@@ -233,7 +248,7 @@ export class CacheManager {
             return null;
         }
         const model = JSON.parse(canonicalBytes.toString('utf8'));
-        if (model.canonicalFormatVersion !== 2 || model.extractionRevision !== 2) return null;
+        if (model.canonicalFormatVersion !== 3 || model.extractionRevision !== 3) return null;
         for (const asset of model.assets) {
             if (!asset.filename) {
                 asset.data = null;
@@ -253,13 +268,60 @@ export class CacheManager {
         const bm25 = await fs.readFile(path.join(root, 'bm25.json'), 'utf8').then(JSON.parse, () => null);
         const semantic = await fs.readFile(this.semanticPath(documentId, generation), 'utf8').then(JSON.parse, () =>
             fs.readFile(path.join(root, 'semantic.json'), 'utf8').then(JSON.parse, () => null));
-        return { model, pdfBytes: await fs.readFile(path.join(root, 'source.pdf')), bm25, semantic };
+        return { model, pdfBytes: await fs.readFile(path.join(root, 'source.pdf')), bm25: bm25?.version === 2 ? bm25 : null, semantic };
+    }
+
+    async saveDerivedMarkdown(documentId, generation, serializerFingerprint, sourcePath, metadata) {
+        if (!(await this.generationExists(documentId, generation))) throw new PdfDecompilerError('cache_generation_missing', 'The extraction generation is unavailable.');
+        const targets = this.markdownPaths(documentId, generation, serializerFingerprint);
+        return this.withLock(documentId, `${generation}-markdown-${serializerFingerprint.slice(0, 16)}`, async () => {
+            const existing = await this.loadDerivedMarkdown(documentId, generation, serializerFingerprint);
+            if (existing) return existing;
+            const bytes = await fs.readFile(sourcePath);
+            const checksum = sha256(bytes);
+            if (checksum !== metadata.sha256 || bytes.length !== metadata.bytes) throw new PdfDecompilerError('MARKDOWN_CHECKSUM_FAILED', 'The Markdown export checksum verification failed.');
+            await fs.mkdir(targets.root, { recursive: true, mode: 0o700 });
+            const stagedContent = `${targets.content}.${process.pid}.${randomUUID()}.tmp`;
+            await fs.writeFile(stagedContent, bytes, { mode: 0o600 });
+            await fs.rename(stagedContent, targets.content);
+            await atomicJson(targets.manifest, {
+                version: 1,
+                documentId,
+                extractionFingerprint: generation,
+                serializerFingerprint,
+                markdownFormatVersion: 1,
+                tableDetail: 'full',
+                bytes: bytes.length,
+                sha256: checksum,
+                createdAt: Date.now(),
+            });
+            return { text: bytes.toString('utf8'), bytes: bytes.length, sha256: checksum, ...metadata };
+        });
+    }
+
+    async loadDerivedMarkdown(documentId, generation, serializerFingerprint) {
+        const targets = this.markdownPaths(documentId, generation, serializerFingerprint);
+        const manifest = await fs.readFile(targets.manifest, 'utf8').then(JSON.parse, () => null);
+        if (!manifest || manifest.version !== 1 || manifest.documentId !== documentId
+            || manifest.extractionFingerprint !== generation || manifest.serializerFingerprint !== serializerFingerprint) return null;
+        const bytes = await fs.readFile(targets.content).catch(() => null);
+        if (!bytes || bytes.length !== manifest.bytes || sha256(bytes) !== manifest.sha256) {
+            await fs.rm(targets.content, { force: true });
+            await fs.rm(targets.manifest, { force: true });
+            return null;
+        }
+        return { text: bytes.toString('utf8'), bytes: bytes.length, sha256: manifest.sha256, manifest };
     }
 
     async saveSemanticIndex(documentId, generation, semantic) {
         if (!(await this.generationExists(documentId, generation))) throw new PdfDecompilerError('cache_generation_missing', 'The extraction generation is unavailable.');
         const target = this.semanticPath(documentId, generation);
         if (!(await exists(target))) await atomicJson(target, semantic);
+    }
+
+    async saveBm25Index(documentId, generation, bm25) {
+        if (!(await this.generationExists(documentId, generation))) throw new PdfDecompilerError('cache_generation_missing', 'The extraction generation is unavailable.');
+        await this.withLock(documentId, `${generation}-bm25`, () => atomicJson(path.join(this.generationPath(documentId, generation), 'bm25.json'), bm25));
     }
 
     async saveDerivedAsset(asset) {
@@ -344,7 +406,15 @@ export class CacheManager {
             for (const generation of await fs.readdir(path.join(documentsRoot, documentName)).catch(() => [])) {
                 const root = path.join(documentsRoot, documentName, generation);
                 const manifest = await fs.readFile(path.join(root, 'manifest.json'), 'utf8').then(JSON.parse, () => null);
-                if (manifest) entries.push({ documentId: documentName, generation, root, manifest, bytes: await directoryBytes(root) });
+                if (manifest) entries.push({
+                    documentId: documentName,
+                    generation,
+                    root,
+                    manifest,
+                    bytes: await directoryBytes(root)
+                        + await directoryBytes(path.join(this.root, 'derived', documentName, generation))
+                        + await directoryBytes(path.join(this.root, 'indexes', documentName, generation)),
+                });
             }
         }
         entries.sort((a, b) => a.manifest.lastAccessedAt - b.manifest.lastAccessedAt || a.root.localeCompare(b.root));
@@ -367,7 +437,7 @@ export class CacheManager {
             permissionStatus: this.permissionStatus,
             retentionDays: this.config.cache.retentionDays,
             maxBytes: this.config.cache.maxBytes,
-            stores: ['original_pdf', 'canonical_json', 'extracted_text', 'images', 'renders', 'bm25_index', 'semantic_index', 'metadata', 'embeddings'],
+            stores: ['original_pdf', 'canonical_json', 'extracted_text', 'images', 'renders', 'markdown_exports', 'bm25_index', 'semantic_index', 'metadata', 'embeddings'],
             processLocal: this.mode !== 'persistent',
         };
     }

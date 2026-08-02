@@ -164,6 +164,27 @@ test('independently positioned columns retain column-major deterministic order',
     await manager.closeDocument(second.opened);
 });
 
+test('semantic headings, nested lists, ordered starts, and code blocks survive real extraction into Markdown', async t => {
+    const manager = await managerFor(t);
+    const sample = await modelFor(manager, 'semantic-blocks.pdf');
+    const blocks = sample.model.elements.filter(element => element.type === 'block');
+    assert.deepEqual(blocks.filter(block => block.role === 'heading').map(block => block.headingLevel), [1, 2]);
+    assert.deepEqual(blocks.filter(block => block.role === 'list').map(block => [block.listKind, block.listLevel, block.listStart, block.listContinuation]), [
+        ['ordered', 0, 1, false], ['unordered', 1, null, false], ['ordered', 0, 4, false], ['ordered', 0, 4, true],
+    ]);
+    const continued = blocks.filter(block => block.role === 'list').slice(-2);
+    assert.equal(continued[0].listItemId, continued[1].listItemId);
+    assert.ok(blocks.some(block => block.role === 'code'));
+    const markdown = await manager.getPages({ ...sample.opened, pages: [1], outputFormat: 'markdown', tableDetail: 'full' });
+    assert.match(markdown.markdown, /^<!-- pdf-decompiler page=1 -->/);
+    assert.match(markdown.markdown, /# PRIMARY HEADING/);
+    assert.match(markdown.markdown, /    - Nested unordered item/);
+    assert.match(markdown.markdown, /4\. Ordered restart item/);
+    assert.match(markdown.markdown, /    Continuation paragraph for ordered item/);
+    assert.match(markdown.markdown, /```/);
+    await manager.closeDocument(sample.opened);
+});
+
 test('public parser code schema rejects arbitrary backend strings', () => {
     assert.equal(ParserErrorCodeSchema.safeParse('PDF_INVALID_XREF').success, true);
     assert.equal(ParserErrorCodeSchema.safeParse('backend said bad xref').success, false);

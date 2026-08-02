@@ -1,6 +1,6 @@
 import assert from 'node:assert/strict';
 import test from 'node:test';
-import { applyResultBudget, resolveBudget } from '../src/runtime/budget.mjs';
+import { applyFairPageBudget, applyResultBudget, resolveBudget } from '../src/runtime/budget.mjs';
 
 const items = Array.from({ length: 8 }, (_, index) => ({ id: `block:${index + 1}`, type: 'block', page: index + 1, text: 'evidence' }));
 
@@ -26,4 +26,36 @@ test('a single oversized item is omitted without exceeding the response limit', 
     assert.equal(result.items.length, 0);
     assert.equal(result.omissions[0].reason, 'response_bytes');
     assert.equal(result.usage.responseBytes, 0);
+});
+
+test('fair page budgeting is deterministic, resumable, and advances beyond permanently oversized items', () => {
+    const pageItems = [
+        { page: 1, items: [{ id: 'p1-large', type: 'block', page: 1, text: 'x'.repeat(1000) }, { id: 'p1-small', type: 'block', page: 1, text: 'one' }] },
+        { page: 2, items: [{ id: 'p2-small', type: 'block', page: 2, text: 'two' }] },
+        { page: 3, items: [{ id: 'p3-small', type: 'block', page: 3, text: 'three' }] },
+    ];
+    const budget = resolveBudget({ responseBytes: 250, estimatedTokens: 1000, textBlocks: 3, pages: 3 });
+    const first = applyFairPageBudget(pageItems, budget);
+    assert.ok(first.omissions.some(omission => omission.id === 'p1-large'));
+    assert.deepEqual(new Set(first.items.map(item => item.page)), new Set([1, 2, 3]));
+    assert.equal(first.nextPosition, null);
+    assert.deepEqual(applyFairPageBudget(pageItems, budget), first);
+});
+
+test('fair page cursor positions do not duplicate or skip elements across continuations', () => {
+    const pageItems = Array.from({ length: 3 }, (_, page) => ({
+        page: page + 1,
+        items: Array.from({ length: 4 }, (_, index) => ({ id: `${page + 1}:${index}`, type: 'block', page: page + 1, text: 'bounded payload' })),
+    }));
+    const budget = resolveBudget({ responseBytes: 220, estimatedTokens: 1000, textBlocks: 3, pages: 3 });
+    const ids = [];
+    let position = null;
+    do {
+        const page = applyFairPageBudget(pageItems, budget, position);
+        assert.ok(page.items.length > 0 || page.omissions.length > 0);
+        ids.push(...page.items.map(item => item.id));
+        position = page.nextPosition;
+    } while (position);
+    assert.equal(ids.length, 12);
+    assert.equal(new Set(ids).size, ids.length);
 });

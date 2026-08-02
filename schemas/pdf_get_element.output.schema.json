@@ -35,618 +35,52 @@
     "data": {
       "anyOf": [
         {
-          "oneOf": [
-            {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "page": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "readingOrder": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "bbox": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        },
-                        "width": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        },
-                        "height": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y",
-                        "width",
-                        "height"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "citation": {
-                  "type": "object",
-                  "properties": {
-                    "documentId": {
-                      "type": "string",
-                      "pattern": "^doc_[a-f0-9]{64}$"
-                    },
-                    "extractionFingerprint": {
-                      "type": "string",
-                      "pattern": "^[a-f0-9]{64}$"
-                    },
-                    "pageId": {
-                      "type": "string",
-                      "pattern": "^page:\\d+$"
-                    },
-                    "elementId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "bbox": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "x": {
-                              "type": "number"
-                            },
-                            "y": {
-                              "type": "number"
-                            },
-                            "width": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            },
-                            "height": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            }
-                          },
-                          "required": [
-                            "x",
-                            "y",
-                            "width",
-                            "height"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "documentId",
-                    "extractionFingerprint",
-                    "pageId",
-                    "elementId",
-                    "bbox"
-                  ],
-                  "additionalProperties": false
-                },
-                "contentFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "locationFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "type": {
-                  "type": "string",
-                  "const": "block"
-                },
-                "role": {
-                  "type": "string",
-                  "enum": [
-                    "heading",
-                    "text",
-                    "list",
-                    "ocr"
-                  ]
-                },
-                "text": {
-                  "type": "string"
-                },
-                "extractionMethod": {
-                  "type": "string"
-                },
-                "confidence": {
-                  "type": "number",
-                  "minimum": 0,
-                  "maximum": 1
-                }
-              },
-              "required": [
-                "id",
-                "page",
-                "readingOrder",
-                "bbox",
-                "citation",
-                "contentFingerprint",
-                "locationFingerprint",
-                "type",
-                "role",
-                "text",
-                "extractionMethod",
-                "confidence"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "page": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "readingOrder": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "bbox": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        },
-                        "width": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        },
-                        "height": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y",
-                        "width",
-                        "height"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "citation": {
-                  "type": "object",
-                  "properties": {
-                    "documentId": {
-                      "type": "string",
-                      "pattern": "^doc_[a-f0-9]{64}$"
-                    },
-                    "extractionFingerprint": {
-                      "type": "string",
-                      "pattern": "^[a-f0-9]{64}$"
-                    },
-                    "pageId": {
-                      "type": "string",
-                      "pattern": "^page:\\d+$"
-                    },
-                    "elementId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "bbox": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "x": {
-                              "type": "number"
-                            },
-                            "y": {
-                              "type": "number"
-                            },
-                            "width": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            },
-                            "height": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            }
-                          },
-                          "required": [
-                            "x",
-                            "y",
-                            "width",
-                            "height"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "documentId",
-                    "extractionFingerprint",
-                    "pageId",
-                    "elementId",
-                    "bbox"
-                  ],
-                  "additionalProperties": false
-                },
-                "contentFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "locationFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "type": {
-                  "type": "string",
-                  "const": "table"
-                },
-                "rows": {
-                  "type": "array",
-                  "items": {
-                    "type": "array",
-                    "items": {
-                      "type": "string"
-                    }
-                  }
-                },
-                "cells": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string",
-                        "minLength": 1
-                      },
-                      "row": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "column": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "rowSpan": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "columnSpan": {
-                        "type": "integer",
-                        "exclusiveMinimum": 0,
-                        "maximum": 9007199254740991
-                      },
-                      "text": {
-                        "type": "string"
-                      },
-                      "bbox": {
-                        "anyOf": [
-                          {
-                            "type": "object",
-                            "properties": {
-                              "x": {
-                                "type": "number"
-                              },
-                              "y": {
-                                "type": "number"
-                              },
-                              "width": {
-                                "type": "number",
-                                "exclusiveMinimum": 0
-                              },
-                              "height": {
-                                "type": "number",
-                                "exclusiveMinimum": 0
-                              }
-                            },
-                            "required": [
-                              "x",
-                              "y",
-                              "width",
-                              "height"
-                            ],
-                            "additionalProperties": false
-                          },
-                          {
-                            "type": "null"
-                          }
-                        ]
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "row",
-                      "column",
-                      "rowSpan",
-                      "columnSpan",
-                      "text",
-                      "bbox"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "text": {
-                  "type": "string"
-                }
-              },
-              "required": [
-                "id",
-                "page",
-                "readingOrder",
-                "bbox",
-                "citation",
-                "contentFingerprint",
-                "locationFingerprint",
-                "type",
-                "rows",
-                "cells",
-                "text"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "page": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "readingOrder": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "bbox": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        },
-                        "width": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        },
-                        "height": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y",
-                        "width",
-                        "height"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "citation": {
-                  "type": "object",
-                  "properties": {
-                    "documentId": {
-                      "type": "string",
-                      "pattern": "^doc_[a-f0-9]{64}$"
-                    },
-                    "extractionFingerprint": {
-                      "type": "string",
-                      "pattern": "^[a-f0-9]{64}$"
-                    },
-                    "pageId": {
-                      "type": "string",
-                      "pattern": "^page:\\d+$"
-                    },
-                    "elementId": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "bbox": {
-                      "anyOf": [
-                        {
-                          "type": "object",
-                          "properties": {
-                            "x": {
-                              "type": "number"
-                            },
-                            "y": {
-                              "type": "number"
-                            },
-                            "width": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            },
-                            "height": {
-                              "type": "number",
-                              "exclusiveMinimum": 0
-                            }
-                          },
-                          "required": [
-                            "x",
-                            "y",
-                            "width",
-                            "height"
-                          ],
-                          "additionalProperties": false
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    }
-                  },
-                  "required": [
-                    "documentId",
-                    "extractionFingerprint",
-                    "pageId",
-                    "elementId",
-                    "bbox"
-                  ],
-                  "additionalProperties": false
-                },
-                "contentFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "locationFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "type": {
-                  "type": "string",
-                  "const": "figure"
-                },
-                "figureKind": {
-                  "type": "string",
-                  "enum": [
-                    "embedded_image",
-                    "page_visual"
-                  ]
-                },
-                "caption": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "text": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "asset": {
+          "type": "object",
+          "properties": {
+            "element": {
+              "oneOf": [
+                {
                   "type": "object",
                   "properties": {
                     "id": {
                       "type": "string",
                       "minLength": 1
                     },
-                    "kind": {
-                      "type": "string",
-                      "minLength": 1
+                    "page": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
                     },
-                    "documentId": {
-                      "type": "string",
-                      "pattern": "^doc_[a-f0-9]{64}$"
+                    "readingOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     },
-                    "extractionFingerprint": {
-                      "type": "string",
-                      "pattern": "^[a-f0-9]{64}$"
-                    },
-                    "mimeType": {
-                      "type": "string",
-                      "minLength": 1
-                    },
-                    "width": {
-                      "type": "number",
-                      "minimum": 0
-                    },
-                    "height": {
-                      "type": "number",
-                      "minimum": 0
-                    },
-                    "sha256": {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "pattern": "^[a-f0-9]{64}$"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "deferredRender": {
+                    "bbox": {
                       "anyOf": [
                         {
                           "type": "object",
                           "properties": {
-                            "page": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
+                            "x": {
+                              "type": "number"
                             },
-                            "format": {
-                              "type": "string",
-                              "enum": [
-                                "png",
-                                "jpeg"
-                              ]
+                            "y": {
+                              "type": "number"
                             },
-                            "maxDimension": {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
+                            "width": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "height": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
                             }
                           },
                           "required": [
-                            "page",
-                            "format",
-                            "maxDimension"
+                            "x",
+                            "y",
+                            "width",
+                            "height"
                           ],
                           "additionalProperties": false
                         },
@@ -655,109 +89,384 @@
                         }
                       ]
                     },
-                    "uri": {
+                    "citation": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "pattern": "^doc_[a-f0-9]{64}$"
+                        },
+                        "extractionFingerprint": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "pageId": {
+                          "type": "string",
+                          "pattern": "^page:\\d+$"
+                        },
+                        "elementId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bbox": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "width",
+                                "height"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "extractionFingerprint",
+                        "pageId",
+                        "elementId",
+                        "bbox"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "contentFingerprint": {
                       "type": "string",
-                      "pattern": "^pdf-decompiler:\\/\\/.*"
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "locationFingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "block"
+                    },
+                    "role": {
+                      "type": "string",
+                      "enum": [
+                        "heading",
+                        "text",
+                        "list",
+                        "code"
+                      ]
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "textSource": {
+                      "type": "string",
+                      "enum": [
+                        "native",
+                        "ocr"
+                      ]
+                    },
+                    "headingLevel": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 6
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "roleConfidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
+                    },
+                    "listKind": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "ordered",
+                            "unordered"
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "listLevel": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 32
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "listStart": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "listOrdinal": {
+                      "anyOf": [
+                        {
+                          "type": "integer",
+                          "minimum": 1,
+                          "maximum": 1000000
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "listItemId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "listContinuation": {
+                      "type": "boolean"
+                    },
+                    "codeLanguage": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "pattern": "^[a-z0-9_+-]{1,32}$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "ocrSource": {
+                      "anyOf": [
+                        {
+                          "oneOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "scope": {
+                                  "type": "string",
+                                  "const": "page"
+                                },
+                                "figureId": {
+                                  "type": "null"
+                                },
+                                "regionId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "bbox": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "width": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0
+                                        },
+                                        "height": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "width",
+                                        "height"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "scope",
+                                "figureId",
+                                "regionId",
+                                "bbox"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "object",
+                              "properties": {
+                                "scope": {
+                                  "type": "string",
+                                  "const": "image"
+                                },
+                                "figureId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "regionId": {
+                                  "anyOf": [
+                                    {
+                                      "type": "string"
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                },
+                                "bbox": {
+                                  "anyOf": [
+                                    {
+                                      "type": "object",
+                                      "properties": {
+                                        "x": {
+                                          "type": "number"
+                                        },
+                                        "y": {
+                                          "type": "number"
+                                        },
+                                        "width": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0
+                                        },
+                                        "height": {
+                                          "type": "number",
+                                          "exclusiveMinimum": 0
+                                        }
+                                      },
+                                      "required": [
+                                        "x",
+                                        "y",
+                                        "width",
+                                        "height"
+                                      ],
+                                      "additionalProperties": false
+                                    },
+                                    {
+                                      "type": "null"
+                                    }
+                                  ]
+                                }
+                              },
+                              "required": [
+                                "scope",
+                                "figureId",
+                                "regionId",
+                                "bbox"
+                              ],
+                              "additionalProperties": false
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "extractionMethod": {
+                      "type": "string"
+                    },
+                    "confidence": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 1
                     }
                   },
                   "required": [
                     "id",
-                    "kind",
-                    "documentId",
-                    "extractionFingerprint",
-                    "mimeType",
-                    "width",
-                    "height",
-                    "sha256",
-                    "uri"
+                    "page",
+                    "readingOrder",
+                    "bbox",
+                    "citation",
+                    "contentFingerprint",
+                    "locationFingerprint",
+                    "type",
+                    "role",
+                    "text",
+                    "textSource",
+                    "headingLevel",
+                    "roleConfidence",
+                    "listKind",
+                    "listLevel",
+                    "listStart",
+                    "listOrdinal",
+                    "listItemId",
+                    "listContinuation",
+                    "codeLanguage",
+                    "ocrSource",
+                    "extractionMethod",
+                    "confidence"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "id",
-                "page",
-                "readingOrder",
-                "bbox",
-                "citation",
-                "contentFingerprint",
-                "locationFingerprint",
-                "type",
-                "figureKind",
-                "caption",
-                "text",
-                "asset"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
                 },
-                "page": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "readingOrder": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "bbox": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        },
-                        "width": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        },
-                        "height": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y",
-                        "width",
-                        "height"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "citation": {
+                {
                   "type": "object",
                   "properties": {
-                    "documentId": {
-                      "type": "string",
-                      "pattern": "^doc_[a-f0-9]{64}$"
-                    },
-                    "extractionFingerprint": {
-                      "type": "string",
-                      "pattern": "^[a-f0-9]{64}$"
-                    },
-                    "pageId": {
-                      "type": "string",
-                      "pattern": "^page:\\d+$"
-                    },
-                    "elementId": {
+                    "id": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "page": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "readingOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "bbox": {
                       "anyOf": [
@@ -791,275 +500,292 @@
                           "type": "null"
                         }
                       ]
-                    }
-                  },
-                  "required": [
-                    "documentId",
-                    "extractionFingerprint",
-                    "pageId",
-                    "elementId",
-                    "bbox"
-                  ],
-                  "additionalProperties": false
-                },
-                "contentFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "locationFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "type": {
-                  "type": "string",
-                  "const": "annotation"
-                },
-                "subtype": {
-                  "type": "string",
-                  "minLength": 1
-                },
-                "text": {
-                  "anyOf": [
-                    {
-                      "type": "string"
                     },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "author": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "createdAt": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "modifiedAt": {
-                  "anyOf": [
-                    {
-                      "type": "string",
-                      "format": "date-time",
-                      "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "color": {
-                  "anyOf": [
-                    {
-                      "type": "array",
-                      "items": [
-                        {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 255
-                        },
-                        {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 255
-                        },
-                        {
-                          "type": "integer",
-                          "minimum": 0,
-                          "maximum": 255
-                        }
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "flags": {
-                  "anyOf": [
-                    {
+                    "citation": {
                       "type": "object",
                       "properties": {
-                        "raw": {
+                        "documentId": {
+                          "type": "string",
+                          "pattern": "^doc_[a-f0-9]{64}$"
+                        },
+                        "extractionFingerprint": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "pageId": {
+                          "type": "string",
+                          "pattern": "^page:\\d+$"
+                        },
+                        "elementId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bbox": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "width",
+                                "height"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "extractionFingerprint",
+                        "pageId",
+                        "elementId",
+                        "bbox"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "contentFingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "locationFingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "table"
+                    },
+                    "rows": {
+                      "type": "array",
+                      "items": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      }
+                    },
+                    "cells": {
+                      "type": "array",
+                      "items": {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string",
+                            "minLength": 1
+                          },
+                          "row": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "column": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "rowSpan": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "columnSpan": {
+                            "type": "integer",
+                            "exclusiveMinimum": 0,
+                            "maximum": 9007199254740991
+                          },
+                          "text": {
+                            "type": "string"
+                          },
+                          "bbox": {
+                            "anyOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "x": {
+                                    "type": "number"
+                                  },
+                                  "y": {
+                                    "type": "number"
+                                  },
+                                  "width": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  },
+                                  "height": {
+                                    "type": "number",
+                                    "exclusiveMinimum": 0
+                                  }
+                                },
+                                "required": [
+                                  "x",
+                                  "y",
+                                  "width",
+                                  "height"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "null"
+                              }
+                            ]
+                          },
+                          "contextRow": {
+                            "type": "boolean"
+                          },
+                          "visibleIntersection": {
+                            "type": "object",
+                            "properties": {
+                              "rowStart": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "rowEnd": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "columnStart": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              },
+                              "columnEnd": {
+                                "type": "integer",
+                                "exclusiveMinimum": 0,
+                                "maximum": 9007199254740991
+                              }
+                            },
+                            "required": [
+                              "rowStart",
+                              "rowEnd",
+                              "columnStart",
+                              "columnEnd"
+                            ],
+                            "additionalProperties": false
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "row",
+                          "column",
+                          "rowSpan",
+                          "columnSpan",
+                          "text",
+                          "bbox"
+                        ],
+                        "additionalProperties": false
+                      }
+                    },
+                    "text": {
+                      "type": "string"
+                    },
+                    "totalRows": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "totalColumns": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "headerRows": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "preview": {
+                      "type": "object",
+                      "properties": {
+                        "rowStart": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "rowEnd": {
                           "type": "integer",
                           "minimum": 0,
                           "maximum": 9007199254740991
                         },
-                        "names": {
-                          "type": "array",
-                          "items": {
-                            "type": "string"
-                          }
+                        "columnStart": {
+                          "type": "integer",
+                          "exclusiveMinimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "columnEnd": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "partial": {
+                          "type": "boolean"
                         }
                       },
                       "required": [
-                        "raw",
-                        "names"
+                        "rowStart",
+                        "rowEnd",
+                        "columnStart",
+                        "columnEnd",
+                        "partial"
                       ],
                       "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "parentSourceId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "replyToSourceId": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "supported": {
-                  "type": "boolean"
-                },
-                "provenance": {
-                  "type": "object",
-                  "properties": {
-                    "backend": {
-                      "type": "string",
-                      "const": "pdfjs"
-                    },
-                    "sourceId": {
-                      "anyOf": [
-                        {
-                          "type": "string"
-                        },
-                        {
-                          "type": "null"
-                        }
-                      ]
-                    },
-                    "sourceSubtype": {
-                      "type": "string"
                     }
                   },
                   "required": [
-                    "backend",
-                    "sourceId",
-                    "sourceSubtype"
+                    "id",
+                    "page",
+                    "readingOrder",
+                    "bbox",
+                    "citation",
+                    "contentFingerprint",
+                    "locationFingerprint",
+                    "type",
+                    "rows",
+                    "cells",
+                    "text",
+                    "totalRows",
+                    "totalColumns",
+                    "headerRows"
                   ],
                   "additionalProperties": false
-                }
-              },
-              "required": [
-                "id",
-                "page",
-                "readingOrder",
-                "bbox",
-                "citation",
-                "contentFingerprint",
-                "locationFingerprint",
-                "type",
-                "subtype",
-                "text",
-                "author",
-                "createdAt",
-                "modifiedAt",
-                "color",
-                "flags",
-                "parentSourceId",
-                "replyToSourceId",
-                "supported",
-                "provenance"
-              ],
-              "additionalProperties": false
-            },
-            {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string",
-                  "minLength": 1
                 },
-                "page": {
-                  "type": "integer",
-                  "exclusiveMinimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "readingOrder": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "bbox": {
-                  "anyOf": [
-                    {
-                      "type": "object",
-                      "properties": {
-                        "x": {
-                          "type": "number"
-                        },
-                        "y": {
-                          "type": "number"
-                        },
-                        "width": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        },
-                        "height": {
-                          "type": "number",
-                          "exclusiveMinimum": 0
-                        }
-                      },
-                      "required": [
-                        "x",
-                        "y",
-                        "width",
-                        "height"
-                      ],
-                      "additionalProperties": false
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "citation": {
+                {
                   "type": "object",
                   "properties": {
-                    "documentId": {
-                      "type": "string",
-                      "pattern": "^doc_[a-f0-9]{64}$"
-                    },
-                    "extractionFingerprint": {
-                      "type": "string",
-                      "pattern": "^[a-f0-9]{64}$"
-                    },
-                    "pageId": {
-                      "type": "string",
-                      "pattern": "^page:\\d+$"
-                    },
-                    "elementId": {
+                    "id": {
                       "type": "string",
                       "minLength": 1
+                    },
+                    "page": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "readingOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
                     },
                     "bbox": {
                       "anyOf": [
@@ -1093,110 +819,53 @@
                           "type": "null"
                         }
                       ]
-                    }
-                  },
-                  "required": [
-                    "documentId",
-                    "extractionFingerprint",
-                    "pageId",
-                    "elementId",
-                    "bbox"
-                  ],
-                  "additionalProperties": false
-                },
-                "contentFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "locationFingerprint": {
-                  "type": "string",
-                  "pattern": "^[a-f0-9]{64}$"
-                },
-                "type": {
-                  "type": "string",
-                  "const": "link"
-                },
-                "text": {
-                  "anyOf": [
-                    {
-                      "type": "string"
                     },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "url": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "destination": {
-                  "anyOf": [
-                    {
+                    "citation": {
                       "type": "object",
                       "properties": {
-                        "kind": {
+                        "documentId": {
                           "type": "string",
-                          "enum": [
-                            "named",
-                            "explicit",
-                            "unresolved"
-                          ]
+                          "pattern": "^doc_[a-f0-9]{64}$"
                         },
-                        "name": {
+                        "extractionFingerprint": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "pageId": {
+                          "type": "string",
+                          "pattern": "^page:\\d+$"
+                        },
+                        "elementId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bbox": {
                           "anyOf": [
                             {
-                              "type": "string",
-                              "maxLength": 256
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "page": {
-                          "anyOf": [
-                            {
-                              "type": "integer",
-                              "exclusiveMinimum": 0,
-                              "maximum": 9007199254740991
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "x": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "y": {
-                          "anyOf": [
-                            {
-                              "type": "number"
-                            },
-                            {
-                              "type": "null"
-                            }
-                          ]
-                        },
-                        "zoom": {
-                          "anyOf": [
-                            {
-                              "type": "number",
-                              "minimum": 0
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "width",
+                                "height"
+                              ],
+                              "additionalProperties": false
                             },
                             {
                               "type": "null"
@@ -1205,61 +874,34 @@
                         }
                       },
                       "required": [
-                        "kind",
-                        "name",
-                        "page",
-                        "x",
-                        "y",
-                        "zoom"
+                        "documentId",
+                        "extractionFingerprint",
+                        "pageId",
+                        "elementId",
+                        "bbox"
                       ],
                       "additionalProperties": false
                     },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "targetKind": {
-                  "type": "string",
-                  "enum": [
-                    "external_url",
-                    "internal_destination",
-                    "unknown"
-                  ]
-                },
-                "anchored": {
-                  "type": "boolean"
-                },
-                "annotationText": {
-                  "anyOf": [
-                    {
-                      "type": "string"
-                    },
-                    {
-                      "type": "null"
-                    }
-                  ]
-                },
-                "anchorSource": {
-                  "type": "string",
-                  "enum": [
-                    "overlaid_text",
-                    "geometry_overlap",
-                    "none"
-                  ]
-                },
-                "provenance": {
-                  "type": "object",
-                  "properties": {
-                    "backend": {
+                    "contentFingerprint": {
                       "type": "string",
-                      "const": "pdfjs"
+                      "pattern": "^[a-f0-9]{64}$"
                     },
-                    "source": {
+                    "locationFingerprint": {
                       "type": "string",
-                      "const": "link_annotation"
+                      "pattern": "^[a-f0-9]{64}$"
                     },
-                    "sourceId": {
+                    "type": {
+                      "type": "string",
+                      "const": "figure"
+                    },
+                    "figureKind": {
+                      "type": "string",
+                      "enum": [
+                        "embedded_image",
+                        "page_visual"
+                      ]
+                    },
+                    "caption": {
                       "anyOf": [
                         {
                           "type": "string"
@@ -1269,40 +911,812 @@
                         }
                       ]
                     },
-                    "subtype": {
-                      "type": "string"
+                    "text": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "asset": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "kind": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "documentId": {
+                          "type": "string",
+                          "pattern": "^doc_[a-f0-9]{64}$"
+                        },
+                        "extractionFingerprint": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "mimeType": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "width": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "height": {
+                          "type": "number",
+                          "minimum": 0
+                        },
+                        "sha256": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "pattern": "^[a-f0-9]{64}$"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "deferredRender": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "page": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                "format": {
+                                  "type": "string",
+                                  "enum": [
+                                    "png",
+                                    "jpeg"
+                                  ]
+                                },
+                                "maxDimension": {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                }
+                              },
+                              "required": [
+                                "page",
+                                "format",
+                                "maxDimension"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "uri": {
+                          "type": "string",
+                          "pattern": "^pdf-decompiler:\\/\\/.*"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "kind",
+                        "documentId",
+                        "extractionFingerprint",
+                        "mimeType",
+                        "width",
+                        "height",
+                        "sha256",
+                        "uri"
+                      ],
+                      "additionalProperties": false
                     }
                   },
                   "required": [
-                    "backend",
-                    "source",
-                    "sourceId",
-                    "subtype"
+                    "id",
+                    "page",
+                    "readingOrder",
+                    "bbox",
+                    "citation",
+                    "contentFingerprint",
+                    "locationFingerprint",
+                    "type",
+                    "figureKind",
+                    "caption",
+                    "text",
+                    "asset"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "page": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "readingOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "bbox": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "width": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "height": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "width",
+                            "height"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "citation": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "pattern": "^doc_[a-f0-9]{64}$"
+                        },
+                        "extractionFingerprint": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "pageId": {
+                          "type": "string",
+                          "pattern": "^page:\\d+$"
+                        },
+                        "elementId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bbox": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "width",
+                                "height"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "extractionFingerprint",
+                        "pageId",
+                        "elementId",
+                        "bbox"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "contentFingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "locationFingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "annotation"
+                    },
+                    "subtype": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "text": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "author": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "createdAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "modifiedAt": {
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "format": "date-time",
+                          "pattern": "^(?:(?:\\d\\d[2468][048]|\\d\\d[13579][26]|\\d\\d0[48]|[02468][048]00|[13579][26]00)-02-29|\\d{4}-(?:(?:0[13578]|1[02])-(?:0[1-9]|[12]\\d|3[01])|(?:0[469]|11)-(?:0[1-9]|[12]\\d|30)|(?:02)-(?:0[1-9]|1\\d|2[0-8])))T(?:(?:[01]\\d|2[0-3]):[0-5]\\d(?::[0-5]\\d(?:\\.\\d+)?)?(?:Z))$"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "color": {
+                      "anyOf": [
+                        {
+                          "type": "array",
+                          "items": [
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            },
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            },
+                            {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 255
+                            }
+                          ]
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "flags": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "raw": {
+                              "type": "integer",
+                              "minimum": 0,
+                              "maximum": 9007199254740991
+                            },
+                            "names": {
+                              "type": "array",
+                              "items": {
+                                "type": "string"
+                              }
+                            }
+                          },
+                          "required": [
+                            "raw",
+                            "names"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "parentSourceId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "replyToSourceId": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "supported": {
+                      "type": "boolean"
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "properties": {
+                        "backend": {
+                          "type": "string",
+                          "const": "pdfjs"
+                        },
+                        "sourceId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "sourceSubtype": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "backend",
+                        "sourceId",
+                        "sourceSubtype"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "page",
+                    "readingOrder",
+                    "bbox",
+                    "citation",
+                    "contentFingerprint",
+                    "locationFingerprint",
+                    "type",
+                    "subtype",
+                    "text",
+                    "author",
+                    "createdAt",
+                    "modifiedAt",
+                    "color",
+                    "flags",
+                    "parentSourceId",
+                    "replyToSourceId",
+                    "supported",
+                    "provenance"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1
+                    },
+                    "page": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "readingOrder": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "bbox": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "x": {
+                              "type": "number"
+                            },
+                            "y": {
+                              "type": "number"
+                            },
+                            "width": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            },
+                            "height": {
+                              "type": "number",
+                              "exclusiveMinimum": 0
+                            }
+                          },
+                          "required": [
+                            "x",
+                            "y",
+                            "width",
+                            "height"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "citation": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "pattern": "^doc_[a-f0-9]{64}$"
+                        },
+                        "extractionFingerprint": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "pageId": {
+                          "type": "string",
+                          "pattern": "^page:\\d+$"
+                        },
+                        "elementId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bbox": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "width",
+                                "height"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "extractionFingerprint",
+                        "pageId",
+                        "elementId",
+                        "bbox"
+                      ],
+                      "additionalProperties": false
+                    },
+                    "contentFingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "locationFingerprint": {
+                      "type": "string",
+                      "pattern": "^[a-f0-9]{64}$"
+                    },
+                    "type": {
+                      "type": "string",
+                      "const": "link"
+                    },
+                    "text": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "url": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "destination": {
+                      "anyOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "kind": {
+                              "type": "string",
+                              "enum": [
+                                "named",
+                                "explicit",
+                                "unresolved"
+                              ]
+                            },
+                            "name": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "maxLength": 256
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "page": {
+                              "anyOf": [
+                                {
+                                  "type": "integer",
+                                  "exclusiveMinimum": 0,
+                                  "maximum": 9007199254740991
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "x": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "y": {
+                              "anyOf": [
+                                {
+                                  "type": "number"
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            },
+                            "zoom": {
+                              "anyOf": [
+                                {
+                                  "type": "number",
+                                  "minimum": 0
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "kind",
+                            "name",
+                            "page",
+                            "x",
+                            "y",
+                            "zoom"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "targetKind": {
+                      "type": "string",
+                      "enum": [
+                        "external_url",
+                        "internal_destination",
+                        "unknown"
+                      ]
+                    },
+                    "anchored": {
+                      "type": "boolean"
+                    },
+                    "annotationText": {
+                      "anyOf": [
+                        {
+                          "type": "string"
+                        },
+                        {
+                          "type": "null"
+                        }
+                      ]
+                    },
+                    "anchorSource": {
+                      "type": "string",
+                      "enum": [
+                        "overlaid_text",
+                        "geometry_overlap",
+                        "none"
+                      ]
+                    },
+                    "provenance": {
+                      "type": "object",
+                      "properties": {
+                        "backend": {
+                          "type": "string",
+                          "const": "pdfjs"
+                        },
+                        "source": {
+                          "type": "string",
+                          "const": "link_annotation"
+                        },
+                        "sourceId": {
+                          "anyOf": [
+                            {
+                              "type": "string"
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        },
+                        "subtype": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "backend",
+                        "source",
+                        "sourceId",
+                        "subtype"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "page",
+                    "readingOrder",
+                    "bbox",
+                    "citation",
+                    "contentFingerprint",
+                    "locationFingerprint",
+                    "type",
+                    "text",
+                    "url",
+                    "destination",
+                    "targetKind",
+                    "anchored",
+                    "annotationText",
+                    "anchorSource",
+                    "provenance"
                   ],
                   "additionalProperties": false
                 }
-              },
-              "required": [
-                "id",
-                "page",
-                "readingOrder",
-                "bbox",
-                "citation",
-                "contentFingerprint",
-                "locationFingerprint",
-                "type",
-                "text",
-                "url",
-                "destination",
-                "targetKind",
-                "anchored",
-                "annotationText",
-                "anchorSource",
-                "provenance"
-              ],
-              "additionalProperties": false
+              ]
+            },
+            "tableSelection": {
+              "anyOf": [
+                {
+                  "type": "object",
+                  "properties": {
+                    "rowStart": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "rowEnd": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "columnStart": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "columnEnd": {
+                      "type": "integer",
+                      "exclusiveMinimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "contextRows": {
+                      "type": "array",
+                      "items": {
+                        "type": "integer",
+                        "exclusiveMinimum": 0,
+                        "maximum": 9007199254740991
+                      }
+                    },
+                    "partial": {
+                      "type": "boolean"
+                    },
+                    "totalRows": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "totalColumns": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    }
+                  },
+                  "required": [
+                    "rowStart",
+                    "rowEnd",
+                    "columnStart",
+                    "columnEnd",
+                    "contextRows",
+                    "partial",
+                    "totalRows",
+                    "totalColumns"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "null"
+                }
+              ]
             }
-          ]
+          },
+          "required": [
+            "element",
+            "tableSelection"
+          ],
+          "additionalProperties": false
         },
         {
           "type": "object",
@@ -1369,6 +1783,37 @@
                     "retryable",
                     "requiresPassword",
                     "requiresConfigurationChange"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "MARKDOWN_EXPORT_TOO_LARGE",
+                        "MARKDOWN_SERIALIZATION_TIMEOUT",
+                        "MARKDOWN_SERIALIZATION_MEMORY_LIMIT",
+                        "MARKDOWN_CACHE_WRITE_FAILED",
+                        "MARKDOWN_CHECKSUM_FAILED",
+                        "MARKDOWN_SERIALIZATION_FAILED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
                   ],
                   "additionalProperties": false
                 },
@@ -1618,6 +2063,26 @@
           "type": "null"
         }
       ]
+    },
+    "completion": {
+      "type": "object",
+      "properties": {
+        "documentComplete": {
+          "type": "boolean"
+        },
+        "requestedScopeComplete": {
+          "type": "boolean"
+        },
+        "resultComplete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "documentComplete",
+        "requestedScopeComplete",
+        "resultComplete"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -1631,7 +2096,8 @@
     "diagnostics",
     "omissions",
     "budget",
-    "nextCursor"
+    "nextCursor",
+    "completion"
   ],
   "additionalProperties": false,
   "$id": "https://github.com/noobieisgod/PDF-Decompiler-MCP/schemas/pdf_get_element.output.schema.json"

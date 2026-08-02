@@ -158,6 +158,17 @@ function layoutFixtures() {
         'multi-column.pdf': buildFixturePdf([{ texts: [heading, ...[680,650,620,590,560,530,500,470].flatMap((y,i)=>[{x:72,y,text:`Left column ${['alpha','beta','gamma','delta','epsilon','zeta','eta','theta'][i]}`},{x:330,y,text:`Right column ${['one','two','three','four','five','six','seven','eight'][i]}`}]), { x: 72, y: 430, size: 13, text: 'Spanning footer across both columns with deterministic text reaching far margin' }] }]),
         'layout-sidebar.pdf': buildFixturePdf([{ texts: [heading, ...[680,650,620].map((y,i)=>({x:72,y,text:`Main report ${['alpha','beta','gamma'][i]}`})), ...[680,650,620].map((y,i)=>({x:440,y,text:`Sidebar ${['note','detail','aside'][i]}`}))] }]),
         'layout-code.pdf': buildFixturePdf([{ texts: [heading, {x:72,y:680,text:'function example() {'},{x:100,y:660,text:'return deterministic;'},{x:72,y:640,text:'}'}] }]),
+        'semantic-blocks.pdf': buildFixturePdf([{ texts: [
+            {x:72,y:740,size:24,text:'PRIMARY HEADING'},
+            {x:72,y:700,size:18,text:'SECONDARY HEADING'},
+            {x:72,y:660,text:'1. Ordered first item'},
+            {x:96,y:630,text:'- Nested unordered item'},
+            {x:72,y:600,text:'4. Ordered restart item'},
+            {x:96,y:578,text:'Continuation paragraph for ordered item'},
+            {x:72,y:510,text:'function fencedExample() {'},
+            {x:92,y:498,text:'return `nested`;'},
+            {x:72,y:486,text:'}'},
+        ] }]),
         'layout-ambiguous.pdf': buildFixturePdf([{ texts: [{x:72,y:700,text:'Ambiguous left top'},{x:330,y:680,text:'Ambiguous right offset'},{x:72,y:640,text:'Ambiguous left bottom'}] }]),
     };
 }
@@ -211,6 +222,11 @@ function visualFixtures() {
         'raster-photograph.pdf': buildFixturePdf([{ images: [{...photo,name:'Photo',x:90,y:280,drawWidth:430,drawHeight:300}] }]),
         'image-only.pdf': buildFixturePdf([{ images: [{...photo,name:'Image',x:0,y:0,drawWidth:612,drawHeight:792}] }]),
         'scan-readable.pdf': buildFixturePdf([{ images: [{...readable,name:'Scan',x:0,y:0,drawWidth:612,drawHeight:792}] }]),
+        'image-ocr.pdf': buildFixturePdf([{ texts: [{x:72,y:740,text:'Native image OCR heading'}], images: [{...readable,name:'OcrRegion',x:90,y:260,drawWidth:430,drawHeight:430}] }]),
+        'multiple-image-ocr.pdf': buildFixturePdf([{ texts: [{x:72,y:740,text:'Two OCR regions'}], images: [
+            {...readable,name:'OcrRegionOne',x:40,y:400,drawWidth:250,drawHeight:300},
+            {...rasterText(['SECOND OCR REGION TEXT'], { width: 600, height: 800, scale: 7 }),name:'OcrRegionTwo',x:320,y:400,drawWidth:250,drawHeight:300},
+        ] }]),
         'scan-unreadable.pdf': buildFixturePdf([{ images: [{...unreadable,name:'Scan',x:0,y:0,drawWidth:612,drawHeight:792}] }]),
         'vector-diagram.pdf': buildFixturePdf([{ graphics: '0.1 0.4 0.8 rg 72 300 450 300 re f 0 0 0 RG 72 300 m 522 600 l S' }]),
         'vector-transformed.pdf': buildFixturePdf([{ graphics: 'q 0.8 0.2 -0.2 0.8 120 100 cm 0.7 0.2 0.1 rg 50 200 300 180 re f Q' }]),
@@ -241,7 +257,7 @@ function expectedFixtureBehavior(name) {
     if (name === 'blank.pdf') Object.assign(result, { pageClassifications: ['blank'], visualTypes: ['none'], elementTypes: [], boundingBoxesRequired: false });
     if (name.startsWith('scan-') || name === 'scanned-proxy.pdf' || name === 'image-only.pdf') Object.assign(result, {
         pageClassifications: ['scan_like', 'ocr_text'], visualTypes: ['raster'], elementTypes: ['figure', 'block'], warnings: ['ocr_unavailable_or_rejected'],
-        ocrText: name === 'scan-readable.pdf' ? 'OCR SUCCESS TEXT' : null,
+        ocrText: ['scan-readable.pdf', 'image-ocr.pdf', 'multiple-image-ocr.pdf'].includes(name) ? 'OCR SUCCESS TEXT' : null,
     });
     if (name.startsWith('vector-')) Object.assign(result, {
         pageClassifications: ['visual'], visualTypes: name === 'vector-unsupported.pdf' ? ['unknown'] : ['vector'],
@@ -312,7 +328,7 @@ export async function generateFixtures(directory = fileURLToPath(new URL('./gene
             generated: true,
             packageAllowed: false,
             purpose: name.replace(/\.pdf$/, '').replaceAll('-', ' '),
-            ocrRequired: name === 'scan-readable.pdf',
+            ocrRequired: ['scan-readable.pdf', 'image-ocr.pdf', 'multiple-image-ocr.pdf'].includes(name),
             expected: expectedFixtureBehavior(name),
         }])),
         localOnlyExcluded: ['Heavy Test One.pdf', 'Medium Test One.pdf', 'Medium Test Two.pdf'],

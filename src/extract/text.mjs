@@ -61,23 +61,70 @@ function buildTextLines(items) {
     });
 }
 
-function classifyBlockRole(text) {
+function classifyBlock(text) {
     const trimmed = text.trim();
-    if (!trimmed) {
-        return 'text';
-    }
-    if (/^[-*]\s+\S/.test(trimmed) || /^\d+\.\s+\S/.test(trimmed)) {
-        return 'list';
+    if (!trimmed) return { role: 'text', roleConfidence: 1 };
+    const ordered = /^(\s*)(\d+)[.)]\s+\S/.exec(text);
+    const unordered = /^(\s*)[-*+]\s+\S/.exec(text);
+    const list = ordered || unordered;
+    if (list) return {
+        role: 'list',
+        roleConfidence: 0.95,
+        listKind: ordered ? 'ordered' : 'unordered',
+        listLevel: Math.min(32, Math.floor((list[1]?.length || 0) / 2)),
+        listStart: ordered ? Number(ordered[2]) : null,
+        listOrdinal: ordered ? Number(ordered[2]) : null,
+        listContinuation: false,
+    };
+    const lines = text.split('\n');
+    if (lines.length > 1 && (lines.filter(line => /^ {4}|^\t/.test(line)).length >= Math.ceil(lines.length * 0.6)
+        || lines.filter(line => /[{}();=]|\b(?:const|let|function|return|class|import)\b/.test(line)).length >= Math.ceil(lines.length * 0.6))) {
+        return { role: 'code', roleConfidence: 0.75, codeLanguage: null };
     }
     if (trimmed.length <= 80 && /^(?:[A-Z0-9][A-Z0-9\s,:;()/-]+)$/.test(trimmed)) {
-        return 'heading';
+        return { role: 'heading', headingLevel: 2, roleConfidence: 0.75 };
     }
-    return 'text';
+    return { role: 'text', roleConfidence: 1 };
 }
 
-function orderBlocks(blocks, viewport) {
+function attachMarginNumbers(blocks, regionX, regionWidth) {
+    const pageLabels = blocks.filter(block => /^\d{2,4}$/.test(block.text.trim()) && block.bbox?.x >= regionX + regionWidth * 0.72);
+    const sectionLabels = blocks.filter(block => /^\d$/.test(block.text.trim()) && block.bbox?.x <= regionX + regionWidth * 0.15);
+    const activePageLabels = pageLabels.length >= 3 ? pageLabels : [];
+    const activeSectionLabels = sectionLabels.length >= 3 ? sectionLabels : [];
+    if (!activePageLabels.length && !activeSectionLabels.length) return blocks;
+    const labels = [...activePageLabels, ...activeSectionLabels];
+    const result = blocks.filter(block => !labels.includes(block));
+    for (const label of labels.sort((a, b) => a.bbox.y - b.bbox.y || a.sourceIndex - b.sourceIndex)) {
+        let target = null;
+        let distance = Infinity;
+        for (const block of result) {
+            if (!block.bbox) continue;
+            const delta = Math.abs((block.bbox.y + block.bbox.height / 2) - (label.bbox.y + label.bbox.height / 2));
+            if (delta < distance) {
+                distance = delta;
+                target = block;
+            }
+        }
+        const targetIndex = target ? result.indexOf(target) : result.length - 1;
+        result.splice(targetIndex + (activePageLabels.includes(label) ? 1 : 0), 0, label);
+    }
+    return result;
+}
+
+function orderBlocks(blocks, viewport, regionX = 0) {
     const width = viewport?.width || 0;
     const height = viewport?.height || 0;
+    if (width > height * 1.25 && blocks.length >= 6) {
+        const split = regionX + width / 2;
+        const left = blocks.filter(block => !block.bbox || block.bbox.x + block.bbox.width / 2 < split);
+        const right = blocks.filter(block => block.bbox && block.bbox.x + block.bbox.width / 2 >= split);
+        if (left.length >= 3 && right.length >= 3) {
+            const leftResult = orderBlocks(left, { width: width / 2, height }, regionX);
+            const rightResult = orderBlocks(right, { width: width / 2, height }, split);
+            return { blocks: [...leftResult.blocks, ...rightResult.blocks], warnings: [...new Map([...leftResult.warnings, ...rightResult.warnings].map(warning => [JSON.stringify(warning), warning])).values()] };
+        }
+    }
     const spanning = blocks.filter(block => block.role === 'heading' || (width > 0 && block.bbox?.width / width >= SPANNING_BLOCK_WIDTH_RATIO));
     const candidates = blocks.filter(block => !spanning.includes(block) && block.bbox);
     const starts = [...new Set(candidates.map(block => block.bbox.x))].sort((a, b) => a - b);
@@ -100,7 +147,7 @@ function orderBlocks(blocks, viewport) {
     if (!hasColumns) {
         const ordered = [...blocks].sort((a, b) => a.bbox?.y - b.bbox?.y || a.bbox?.x - b.bbox?.x || a.sourceIndex - b.sourceIndex);
         const ambiguous = split !== null && largestGap >= MIN_COLUMN_GUTTER_PT && left.length && right.length;
-        return { blocks: ordered, warnings: ambiguous ? [{ code: 'layout_ambiguous' }] : [] };
+        return { blocks: attachMarginNumbers(ordered, regionX, width), warnings: ambiguous ? [{ code: 'layout_ambiguous' }] : [] };
     }
     const columnSort = values => [...values].sort((a, b) => a.bbox.y - b.bbox.y || a.bbox.x - b.bbox.x || a.sourceIndex - b.sourceIndex);
     const firstColumnY = Math.min(...candidates.map(block => block.bbox.y));
@@ -108,7 +155,7 @@ function orderBlocks(blocks, viewport) {
     const before = columnSort(spanning.filter(block => block.bbox.y + block.bbox.height <= firstColumnY));
     const after = columnSort(spanning.filter(block => block.bbox.y >= lastColumnY));
     const middle = columnSort(spanning.filter(block => !before.includes(block) && !after.includes(block)));
-    return { blocks: [...before, ...columnSort(left), ...columnSort(right), ...middle, ...after], warnings: middle.length ? [{ code: 'layout_ambiguous' }] : [] };
+    return { blocks: attachMarginNumbers([...before, ...columnSort(left), ...columnSort(right), ...middle, ...after], regionX, width), warnings: middle.length ? [{ code: 'layout_ambiguous' }] : [] };
 }
 
 export function buildTextBlocks(items, viewport = null) {
@@ -129,7 +176,7 @@ export function buildTextBlocks(items, viewport = null) {
         const x = bbox?.x ?? Math.min(...lineItems.map(item => item.x));
         const sourceIndex = Math.min(...lineItems.map(item => items.indexOf(item)).filter(index => index >= 0));
         if (!current) {
-            current = { text, yTop, yBottom, x, bboxes: [bbox], spans: [...lineItems], sourceIndex };
+            current = { text, yTop, yBottom, x, bboxes: [bbox], spans: [...lineItems], sourceIndex, fontSize: Math.max(...lineItems.map(item => item.h || 0)) };
             continue;
         }
         const gap = yTop - current.yBottom;
@@ -141,23 +188,55 @@ export function buildTextBlocks(items, viewport = null) {
             current.bboxes.push(bbox);
             current.spans.push(...lineItems);
             current.sourceIndex = Math.min(current.sourceIndex, sourceIndex);
+            current.fontSize = Math.max(current.fontSize, ...lineItems.map(item => item.h || 0));
         } else {
             blocks.push({
                 ...current,
                 bbox: unionBBoxes(current.bboxes, viewport?.width, viewport?.height),
-                role: classifyBlockRole(current.text),
+                ...classifyBlock(current.text),
             });
-            current = { text, yTop, yBottom, x, bboxes: [bbox], spans: [...lineItems], sourceIndex };
+            current = { text, yTop, yBottom, x, bboxes: [bbox], spans: [...lineItems], sourceIndex, fontSize: Math.max(...lineItems.map(item => item.h || 0)) };
         }
     }
     if (current) {
         blocks.push({
             ...current,
             bbox: unionBBoxes(current.bboxes, viewport?.width, viewport?.height),
-            role: classifyBlockRole(current.text),
+            ...classifyBlock(current.text),
         });
     }
-    return orderBlocks(blocks.map(({ bboxes, ...block }) => block), viewport);
+    const headingSizes = [...new Set(blocks.filter(block => block.role === 'heading').map(block => block.fontSize))].sort((a, b) => b - a);
+    const listStarts = [...new Set(blocks.filter(block => block.role === 'list').map(block => Math.round(block.x)))].sort((a, b) => a - b);
+    const semanticBlocks = blocks.map(({ bboxes, fontSize, ...block }) => ({
+        ...block,
+        ...(block.role === 'heading' ? { headingLevel: Math.min(6, headingSizes.indexOf(fontSize) + 1) } : {}),
+        ...(block.role === 'list' ? { listLevel: Math.min(32, Math.max(0, listStarts.indexOf(Math.round(block.x)))), listItemId: `raw-list-item:${block.sourceIndex}` } : {}),
+    }));
+    let activeList = null;
+    for (let index = 0; index < semanticBlocks.length; index += 1) {
+        const block = semanticBlocks[index];
+        if (block.role === 'list' && !block.listContinuation) {
+            activeList = block;
+            continue;
+        }
+        const gap = activeList?.bbox && block.bbox ? block.bbox.y - (activeList.bbox.y + activeList.bbox.height) : Infinity;
+        if (activeList && block.role === 'text' && gap >= 0 && gap <= 28 && block.bbox.x >= activeList.bbox.x + 12) {
+            semanticBlocks[index] = {
+                ...block,
+                role: 'list',
+                roleConfidence: 0.7,
+                listKind: activeList.listKind,
+                listLevel: activeList.listLevel,
+                listStart: activeList.listStart,
+                listOrdinal: activeList.listOrdinal,
+                listItemId: activeList.listItemId,
+                listContinuation: true,
+            };
+        } else if (gap > 28 || block.role !== 'text') {
+            activeList = null;
+        }
+    }
+    return orderBlocks(semanticBlocks, viewport);
 }
 
 export function normalizeLooseText(text) {

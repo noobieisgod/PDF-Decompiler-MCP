@@ -1,11 +1,11 @@
 import { ROUTE_TEXT_DENSITY, HF_MAX_WORDS } from '../config/constants.mjs';
 import { hfSignature } from './headers-footers.mjs';
-import { classifyRenderFailure, encodePageImage, isKnownRenderEnvironmentError, renderPageImages, renderPageCanvas, scaleCanvas, getImagePlacements } from './images.mjs';
+import { classifyRenderFailure, cropPlacementFromCanvas, encodePageImage, isKnownRenderEnvironmentError, renderPageImages, renderPageCanvas, scaleCanvas, getImagePlacements } from './images.mjs';
 import { anchorLinkAnnotations, buildPageTextWithLinks, getPageAnnotations } from './links.mjs';
 import { detectTesseract, runTesseractOcr } from './ocr.mjs';
 import { buildPageProfile, classifyRegionKind, decidePageRouting, getTargetImageDim, shouldTryOcr } from './router.mjs';
 import { detectTables, extractStructTables, normalizeTableRows } from './tables.mjs';
-import { buildTextBlocks, findCaptionForImage } from './text.mjs';
+import { buildTextBlocks, findCaptionForImage, normalizeLooseText } from './text.mjs';
 
 function buildRuntimeRenderNotice(kind) {
     return `(${kind} unavailable in the current runtime)`;
@@ -15,6 +15,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
         allowImageRendering = true,
         allowOcr = true,
         allowVisualFallback = true,
+        ocrPolicy = 'auto',
     } = options;
     const bodyItems = hfPositions.size > 0
         ? rawItems.filter(item => {
@@ -45,7 +46,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
     let rawLinks = [];
     let pageText = '';
     let rawTextBlocks = [];
-    const extractionWarnings = [...annotationResult.warnings, ...initialLayout.warnings];
+    const extractionWarnings = [...annotationResult.warnings];
     if (pageProfile.visualType === 'unknown') extractionWarnings.push({ code: 'visual_unknown' });
     let ocrAttempted = false;
     let ocrAccepted = false;
@@ -186,7 +187,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
             tables = structTables;
             nonTableItems = bodyItems.filter(item => item.mcid == null || !tableMcids.has(item.mcid));
         } else {
-            ({ tables, nonTableItems } = detectTables(bodyItems));
+            ({ tables, nonTableItems } = detectTables(bodyItems, viewport));
         }
         const normalizedTables = tables.map(table => ({ ...table, rows: normalizeTableRows(table.rows) }));
         if (contentClass === 'table' && normalizedTables.length === 0) contentClass = pageProfile.dominantRole === 'list' ? 'structured_text' : 'text';
@@ -251,6 +252,70 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
                         extractionMethod: img.extractionMethod ?? 'failed',
                     });
             }
+            if (ocrPolicy === 'required' && allowOcr && detectTesseract()) {
+                const nativeBlocks = [...rawTextBlocks];
+                for (let rawImageIndex = 0; rawImageIndex < rawImages.length; rawImageIndex += 1) {
+                    const image = rawImages[rawImageIndex];
+                    if (image.regionKind === 'decorative' || !image.bbox) continue;
+                    ocrAttempted = true;
+                    let ocrBytes = image.data ? Buffer.from(image.data, 'base64') : null;
+                    let pixelWidth = Math.max(1, image.width || image.bbox.width);
+                    let pixelHeight = Math.max(1, image.height || image.bbox.height);
+                    if (!ocrBytes) {
+                        try {
+                            cachedFullCanvas ||= await renderFullPageCanvas();
+                            const crop = cropPlacementFromCanvas(cachedFullCanvas, {
+                                x: image.bbox.x,
+                                yTop: image.bbox.y,
+                                w: image.bbox.width,
+                                h: image.bbox.height,
+                            }, Math.min(maxImageDim || 1400, 1400));
+                            ocrBytes = Buffer.from(await crop.encode('png'));
+                            pixelWidth = crop.width;
+                            pixelHeight = crop.height;
+                            image.data = ocrBytes.toString('base64');
+                            image.mimeType = 'image/png';
+                            image.width = crop.width;
+                            image.height = crop.height;
+                            image.fallbackNeeded = false;
+                            image.fallbackReason = null;
+                            image.extractionMethod = 'ocr_region_crop';
+                        } catch {
+                            extractionWarnings.push({ code: 'image_ocr_unavailable' });
+                            continue;
+                        }
+                    }
+                    const result = await runTesseractOcr(ocrBytes, pageNum, {
+                        pixelWidth,
+                        pixelHeight,
+                        pageWidth: image.bbox.width,
+                        pageHeight: image.bbox.height,
+                        x: image.bbox.x,
+                        y: image.bbox.y,
+                        ocrSource: {
+                            scope: 'image',
+                            rawImageIndex,
+                            regionId: image.placementId || `image-region:${rawImageIndex + 1}`,
+                            bbox: image.bbox,
+                        },
+                    });
+                    if (!result.ok) {
+                        extractionWarnings.push({ code: 'image_ocr_rejected', message: result.reason });
+                        continue;
+                    }
+                    const duplicate = block => {
+                        const normalized = normalizeLooseText(block.text);
+                        return nativeBlocks.some(native => normalizeLooseText(native.text) === normalized && normalized.length > 0
+                            && native.bbox && block.bbox
+                            && Math.max(0, Math.min(native.bbox.x + native.bbox.width, block.bbox.x + block.bbox.width) - Math.max(native.bbox.x, block.bbox.x))
+                                * Math.max(0, Math.min(native.bbox.y + native.bbox.height, block.bbox.y + block.bbox.height) - Math.max(native.bbox.y, block.bbox.y))
+                                / Math.max(1, Math.min(native.bbox.width * native.bbox.height, block.bbox.width * block.bbox.height)) >= 0.5);
+                    };
+                    const accepted = (result.blocks || []).filter(block => !duplicate(block));
+                    rawTextBlocks.push(...accepted);
+                    if (accepted.length) ocrAccepted = true;
+                }
+            }
         }
         const { linkMarkerMap, links, warnings: linkWarnings } = anchorLinkAnnotations(nonTableItems, annotationResult.links);
         rawLinks = links;
@@ -293,7 +358,7 @@ export async function processOnePage({ pageNum, pdfjsPage, viewport, pageHeight,
         textBlocks: rawTextBlocks,
         annotations,
         annotationWidgetCount: annotationResult.widgetCount,
-        warnings: extractionWarnings,
+        warnings: [...new Map(extractionWarnings.map(warning => [JSON.stringify(warning), warning])).values()],
         pageProfile,
         rawImages,
         rawTables,

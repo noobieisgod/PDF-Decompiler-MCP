@@ -95,6 +95,8 @@ function parseTsv(value, geometry) {
     const rows = value.replace(/\r\n/g, '\n').split('\n').slice(1).map(line => line.split('\t')).filter(columns => columns.length >= 12 && columns[0] === '5' && columns[11]?.trim());
     const xScale = geometry?.pageWidth && geometry?.pixelWidth ? geometry.pageWidth / geometry.pixelWidth : 1;
     const yScale = geometry?.pageHeight && geometry?.pixelHeight ? geometry.pageHeight / geometry.pixelHeight : 1;
+    const xOffset = geometry?.x || 0;
+    const yOffset = geometry?.y || 0;
     const words = rows.map((columns, sourceIndex) => ({
         text: columns[11].trim(),
         block: columns[2],
@@ -103,8 +105,8 @@ function parseTsv(value, geometry) {
         confidence: Number(columns[10]),
         sourceIndex,
         bbox: {
-            x: Number(columns[6]) * xScale,
-            y: Number(columns[7]) * yScale,
+            x: xOffset + Number(columns[6]) * xScale,
+            y: yOffset + Number(columns[7]) * yScale,
             width: Number(columns[8]) * xScale,
             height: Number(columns[9]) * yScale,
         },
@@ -127,6 +129,8 @@ function parseTsv(value, geometry) {
             bbox: unionBBoxes(group.map(word => word.bbox), geometry?.pageWidth, geometry?.pageHeight),
             spans: group,
             sourceIndex: Math.min(...group.map(word => word.sourceIndex)),
+            textSource: 'ocr',
+            ocrSource: geometry?.ocrSource || { scope: 'page', figureId: null, regionId: geometry?.regionId || null, bbox: null },
         };
     }).sort((a, b) => a.bbox?.y - b.bbox?.y || a.bbox?.x - b.bbox?.x || a.sourceIndex - b.sourceIndex);
     return { words, blocks, text: blocks.map(block => block.text).join('\n\n') };

@@ -192,7 +192,7 @@ export function extractStructTables(structTree, mcidMap) {
     return tables;
 }
 
-export function detectTables(items) {
+export function detectTables(items, viewport = null) {
     if (items.length === 0) {
         return { tables: [], nonTableItems: [] };
     }
@@ -247,7 +247,16 @@ export function detectTables(items) {
         const populated = grid.flat().map(value => value.trim()).filter(Boolean);
         const numericRatio = populated.filter(value => /(?:^|\s)[+-]?(?:\d+[.,]?\d*|\d*\.\d+)%?(?:\s|$)/.test(value)).length / Math.max(1, populated.length);
         const averageLength = populated.reduce((sum, value) => sum + value.length, 0) / Math.max(1, populated.length);
-        if (numericRatio < 0.2 && averageLength > 12) {
+        const tocRowRatio = grid.filter(row => {
+            const joined = row.join(' ').replace(/\s+/g, ' ').trim();
+            return /^\d+(?:\.\d+)+\b/.test(joined) && /(?:^|\s)\d{2,3}\s*$/.test(joined);
+        }).length / Math.max(1, grid.length);
+        const tocCellRatio = populated.filter(value => /\b\d+(?:\.\d+)+\b/.test(value)).length / Math.max(1, populated.length);
+        const tableItemBoxes = tableRows.flatMap(row => row.items).map(item => item.bbox).filter(Boolean);
+        const tableBox = unionBBoxes(tableItemBoxes, viewport?.width, viewport?.height);
+        const crossesSpread = viewport?.width > viewport?.height * 1.25 && tableBox
+            && tableBox.x < viewport.width / 2 && tableBox.x + tableBox.width > viewport.width / 2;
+        if ((numericRatio < 0.2 && averageLength > 12) || tocRowRatio >= 0.5 || (crossesSpread && (tocRowRatio >= 0.2 || tocCellRatio >= 0.15))) {
             nonTableItems.push(...tableRows.flatMap(row => row.items));
             rowIndex = nextIndex;
             continue;

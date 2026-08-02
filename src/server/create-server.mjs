@@ -1,7 +1,7 @@
 import { McpServer, ResourceTemplate } from '@modelcontextprotocol/server';
 import pkg from '../../package.json' with { type: 'json' };
 import { timingComplete, timingContext, timingMark, timingSnapshot } from '../runtime/timing.mjs';
-import { publicError } from '../core/errors.mjs';
+import { PdfDecompilerError, publicError } from '../core/errors.mjs';
 import {
     CloseSchema,
     DocumentInfoSchema,
@@ -16,33 +16,69 @@ import {
 const READ_ONLY = { readOnlyHint: true, destructiveHint: false, idempotentHint: true, openWorldHint: false };
 
 function envelope(operation, args, data) {
+    const {
+        citations = data?.citation ? [data.citation] : [],
+        warnings = [],
+        diagnostics = null,
+        omissions = [],
+        budget = null,
+        nextCursor = null,
+        completion = { documentComplete: true, requestedScopeComplete: true, resultComplete: nextCursor === null },
+        citation: _citation,
+        ...payload
+    } = data || {};
     return {
         schemaVersion: '3.0.0',
         operation,
         documentId: data?.documentId || args?.documentId || null,
         extractionFingerprint: data?.extractionFingerprint || args?.extractionFingerprint || null,
-        data,
-        citations: data?.citations || data?.citation ? (data.citations || [data.citation]) : [],
-        warnings: data?.warnings || [],
-        diagnostics: data?.diagnostics || null,
-        omissions: data?.omissions || [],
-        budget: data?.budget || null,
-        nextCursor: data?.nextCursor || null,
+        data: payload,
+        citations,
+        warnings,
+        diagnostics,
+        omissions,
+        budget,
+        nextCursor,
+        completion: { ...completion, resultComplete: nextCursor === null },
     };
 }
 
 function compactText(value) {
     const data = value.data || {};
-    return JSON.stringify({
+    if (data.error) return JSON.stringify({ operation: value.operation, error: data.error, completion: value.completion });
+    if (data.outputFormat === 'markdown') {
+        return JSON.stringify({
+            schemaVersion: value.schemaVersion,
+            operation: value.operation,
+            documentId: value.documentId,
+            extractionFingerprint: value.extractionFingerprint,
+            outputFormat: 'markdown',
+            pages: data.pages,
+            markdownBytes: Buffer.byteLength(data.markdown),
+            resourceUris: data.resourceUris,
+            completion: value.completion,
+            nextCursor: value.nextCursor,
+            instruction: value.nextCursor ? 'Call pdf_get_pages again with nextCursor and unchanged arguments.' : 'Markdown retrieval is complete.',
+        }).slice(0, 2048);
+    }
+    const summary = {
         schemaVersion: value.schemaVersion,
         operation: value.operation,
         documentId: value.documentId,
         extractionFingerprint: value.extractionFingerprint,
-        data,
-        warnings: value.warnings,
-        omissions: value.omissions,
+        pages: data.pages || undefined,
+        elementCount: data.elements?.length,
+        resultCount: data.results?.length,
+        elementId: data.element?.id,
+        resourceUri: data.uri,
+        sourceId: data.sourceId,
+        warningCount: value.warnings.length,
+        omissionCount: value.omissions.length,
         nextCursor: value.nextCursor,
-    });
+        completion: value.completion,
+        instruction: value.nextCursor ? `Call ${value.operation} again with nextCursor and unchanged arguments.` : undefined,
+    };
+    return JSON.stringify(summary).slice(0, 2048);
 }
 
 function resultContent(value, asset = null, delivery = 'auto', responseBytes = 1_000_000) {
@@ -71,25 +107,43 @@ function toolHandler(operation, managerCall, { assetResult = false } = {}) {
     return async args => timingContext(operation, async () => {
         timingMark('request_receipt');
         try {
-            const raw = await managerCall(args);
-            timingMark('manager_operation');
-            const data = assetResult ? publicAsset(raw) : raw;
-            const value = envelope(operation, args, data);
-            if (timingSnapshot()) value.diagnostics = { ...(value.diagnostics || {}), ...timingSnapshot() };
             const requestedBytes = Math.min(args.budget?.responseBytes || 1_000_000, 4_000_000);
-            if (assetResult && args.imageDelivery === 'inline' && Buffer.byteLength(raw.data || '', 'base64') > requestedBytes) {
-                value.warnings.push({ code: 'inline_image_omitted', message: 'The image exceeded the response-byte budget and was returned as a resource link.' });
+            let wireResponseBytes = requestedBytes;
+            for (let attempt = 0; attempt < 8; attempt += 1) {
+                const callArgs = attempt && operation === 'pdf_get_pages' ? { ...args, _wireResponseBytes: wireResponseBytes } : args;
+                const raw = await managerCall(callArgs);
+                timingMark('manager_operation');
+                const data = assetResult ? publicAsset(raw) : raw;
+                const value = envelope(operation, args, data);
+                if (timingSnapshot()) value.diagnostics = { ...(value.diagnostics || {}), ...timingSnapshot() };
+                if (assetResult && args.imageDelivery === 'inline' && Buffer.byteLength(raw.data || '', 'base64') > requestedBytes) {
+                    value.warnings.push({ code: 'inline_image_omitted', message: 'The image exceeded the response-byte budget and was returned as a resource link.' });
+                }
+                const result = {
+                    content: resultContent(value, assetResult ? raw : null, args.imageDelivery, requestedBytes),
+                    structuredContent: value,
+                };
+                let wireBytes = Buffer.byteLength(JSON.stringify(result)) + 1024;
+                if (value.budget?.usage) {
+                    value.budget.usage.responseBytes = wireBytes;
+                    value.budget.usage.estimatedTokens = Math.ceil(wireBytes / 4);
+                    wireBytes = Buffer.byteLength(JSON.stringify(result)) + 1024;
+                }
+                if (wireBytes <= requestedBytes) {
+                    timingMark('response_serialization');
+                    timingComplete();
+                    return result;
+                }
+                if (operation !== 'pdf_get_pages') throw new PdfDecompilerError('response_budget_exceeded', 'The complete MCP response exceeded the hard response budget. Reduce the requested scope or continue with a cursor.');
+                wireResponseBytes = Math.floor(wireResponseBytes * 0.7);
             }
-            const result = {
-                content: resultContent(value, assetResult ? raw : null, args.imageDelivery, requestedBytes),
-                structuredContent: value,
-            };
-            timingMark('response_serialization');
-            timingComplete();
-            return result;
+            throw new PdfDecompilerError('response_budget_exceeded', 'The complete MCP response exceeded the hard response budget after deterministic fragment reduction. Reduce the requested scope or continue with a cursor.');
         } catch (error) {
             const failure = publicError(error);
-            const value = envelope(operation, args, { error: failure });
+            const value = envelope(operation, args, {
+                error: failure,
+                completion: { documentComplete: false, requestedScopeComplete: false, resultComplete: true },
+            });
             const result = { content: [{ type: 'text', text: compactText(value) }], structuredContent: value, isError: true };
             timingMark('response_serialization');
             timingComplete();
@@ -167,6 +221,15 @@ export function createServer(manager) {
             title: 'PDF Decompiler immutable resource',
             description: 'Read-only canonical data or an asset bound to one exact extraction generation.',
             mimeType: 'application/octet-stream',
+        },
+        async uri => ({ contents: [{ uri: uri.toString(), ...(await manager.readResource(uri.toString())) }] }));
+
+    server.registerResource('pdf-decompiler-markdown-resource',
+        new ResourceTemplate('pdf-decompiler://document/{documentId}/{extractionFingerprint}/markdown/{markdownFormatVersion}/{serializerFingerprint}/full.md', { list: undefined }),
+        {
+            title: 'PDF Decompiler complete Markdown export',
+            description: 'Read-only complete Markdown bound to one extraction generation and serializer fingerprint.',
+            mimeType: 'text/markdown',
         },
         async uri => ({ contents: [{ uri: uri.toString(), ...(await manager.readResource(uri.toString())) }] }));
 

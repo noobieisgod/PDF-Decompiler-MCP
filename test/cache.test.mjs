@@ -13,7 +13,7 @@ function modelWithAsset() {
     return buildCanonicalModel(Buffer.from('%PDF-cache'), raw, { extractorVersion: '3.0.0', maxPages: 5000, ocrPolicy: 'auto' }, 'deps');
 }
 
-test('canonical cache version 1 is never served under format version 2', async t => {
+test('incompatible canonical cache versions are never served under format version 3', async t => {
     const { config } = await temporaryConfig(t, { cacheMode: 'persistent' });
     const cache = await new CacheManager(config).init();
     t.after(() => cache.close());

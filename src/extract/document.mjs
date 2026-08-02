@@ -450,6 +450,7 @@ export async function extractPageContent(pdfBytes, requestedPages, maxImageDim, 
             allowImageRendering: true,
             allowOcr: budgetStillAvailable && options.ocrPolicy !== 'off',
             allowVisualFallback: false,
+            ocrPolicy: options.ocrPolicy || 'auto',
         };
         const chunkResults = await Promise.all(chunk.map(async (pageData) => {
             if (pageData.error) {

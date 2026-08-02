@@ -2,8 +2,8 @@ import { fingerprint, sha256 } from '../core/crypto.mjs';
 import { normalizeBBox, unionBBoxes } from './geometry.mjs';
 
 export const SCHEMA_VERSION = '3.0.0';
-export const CANONICAL_FORMAT_VERSION = 2;
-export const EXTRACTION_REVISION = 2;
+export const CANONICAL_FORMAT_VERSION = 3;
+export const EXTRACTION_REVISION = 3;
 
 function cleanText(text) {
     return String(text ?? '').replace(/\r\n/g, '\n').replace(/[ \t]+\n/g, '\n').trim();
@@ -45,13 +45,33 @@ function addElement(collection, record, orderHint) {
     collection.push({ ...record, _orderHint: orderHint });
 }
 
+function dedupeRecords(records) {
+    const seen = new Set();
+    return records.filter(record => {
+        const key = JSON.stringify(record);
+        if (seen.has(key)) return false;
+        seen.add(key);
+        return true;
+    });
+}
+
 function finalizePageElements(collection) {
     const ordered = [...collection].sort((a, b) => a._orderHint - b._orderHint
         || (a.bbox?.y ?? Number.MAX_SAFE_INTEGER) - (b.bbox?.y ?? Number.MAX_SAFE_INTEGER)
         || (a.bbox?.x ?? Number.MAX_SAFE_INTEGER) - (b.bbox?.x ?? Number.MAX_SAFE_INTEGER)
         || a.type.localeCompare(b.type)
         || a.id.localeCompare(b.id));
-    return ordered.map(({ _orderHint, ...element }, readingOrder) => ({ ...element, readingOrder }));
+    const withoutHints = ordered.map(({ _orderHint, ...element }) => element);
+    for (const block of withoutHints.filter(element => element.type === 'block' && element.ocrSource?.scope === 'image' && element.ocrSource.figureId)) {
+        const blockIndex = withoutHints.indexOf(block);
+        const figure = withoutHints.find(element => element.id === block.ocrSource.figureId);
+        const figureIndex = withoutHints.indexOf(figure);
+        if (figureIndex >= 0 && blockIndex !== figureIndex + 1) {
+            withoutHints.splice(blockIndex, 1);
+            withoutHints.splice(withoutHints.indexOf(figure) + 1, 0, block);
+        }
+    }
+    return withoutHints.map((element, readingOrder) => ({ ...element, readingOrder }));
 }
 
 function insertionHint(blocks, bbox, sourceIndex = 0) {
@@ -88,7 +108,7 @@ export function buildCanonicalModel(pdfBytes, raw, config, dependencyFingerprint
     for (const rawPage of [...raw.pages].sort((a, b) => a.page - b.page)) {
         const width = rawPage.pageProfile?.viewportWidth || 0;
         const height = rawPage.pageProfile?.viewportHeight || 0;
-        const pageWarnings = [rawPage.fallbackReason, rawPage.filteredReason].filter(Boolean).map(message => ({ code: 'page_warning', message }));
+        let pageWarnings = [rawPage.fallbackReason, rawPage.filteredReason].filter(Boolean).map(message => ({ code: 'page_warning', message }));
         pageWarnings.push(...(rawPage.warnings || []).map(warning => typeof warning === 'string' ? { code: warning } : warning));
         const page = {
             id: `page:${rawPage.page}`,
@@ -129,15 +149,37 @@ export function buildCanonicalModel(pdfBytes, raw, config, dependencyFingerprint
             const bbox = normalizeBBox(block.bbox, width, height);
             if (block.bbox && !bbox) pageWarnings.push({ code: 'invalid_geometry', elementId: id });
             const text = cleanText(block.text);
+            const rawRole = block.role === 'ocr' ? 'text' : block.role;
+            const role = ['heading', 'text', 'list', 'code'].includes(rawRole) ? rawRole : 'text';
+            const textSource = block.textSource === 'ocr' || block.role === 'ocr' || rawPage.extractionMode === 'ocr' ? 'ocr' : 'native';
+            const ocrSource = textSource === 'ocr' ? {
+                scope: block.ocrSource?.scope === 'image' ? 'image' : 'page',
+                figureId: block.ocrSource?.scope === 'image' && Number.isInteger(block.ocrSource.rawImageIndex)
+                    ? `figure:${rawPage.page}:${block.ocrSource.rawImageIndex + 1}` : null,
+                regionId: nullableText(block.ocrSource?.regionId),
+                bbox: normalizeBBox(block.ocrSource?.bbox || block.bbox, width, height),
+            } : null;
+            if (ocrSource?.scope === 'image' && !ocrSource.figureId) pageWarnings.push({ code: 'ocr_source_figure_missing', elementId: id });
             const record = {
                 id,
                 type: 'block',
-                role: ['heading', 'text', 'list', 'ocr'].includes(block.role) ? block.role : rawPage.ocrAccepted ? 'ocr' : 'text',
+                role,
                 page: rawPage.page,
                 bbox,
                 text,
+                textSource,
+                headingLevel: role === 'heading' ? Math.max(1, Math.min(6, Number(block.headingLevel) || 2)) : null,
+                roleConfidence: Number.isFinite(block.roleConfidence) ? Math.max(0, Math.min(1, block.roleConfidence)) : role === 'text' ? 1 : 0.7,
+                listKind: role === 'list' && ['ordered', 'unordered'].includes(block.listKind) ? block.listKind : null,
+                listLevel: role === 'list' && Number.isInteger(block.listLevel) ? Math.max(0, Math.min(32, block.listLevel)) : null,
+                listStart: role === 'list' && Number.isInteger(block.listStart) && block.listStart > 0 ? Math.min(1_000_000, block.listStart) : null,
+                listOrdinal: role === 'list' && Number.isInteger(block.listOrdinal) && block.listOrdinal > 0 ? Math.min(1_000_000, block.listOrdinal) : null,
+                listItemId: role === 'list' ? nullableText(block.listItemId) || `list-item:${rawPage.page}:${index + 1}` : null,
+                listContinuation: role === 'list' ? Boolean(block.listContinuation) : false,
+                codeLanguage: role === 'code' && /^[a-z0-9_+-]{1,32}$/i.test(block.codeLanguage || '') ? block.codeLanguage.toLowerCase() : null,
+                ocrSource,
                 extractionMethod: rawPage.extractionMode,
-                confidence: rawPage.ocrAccepted ? 0.7 : 1,
+                confidence: textSource === 'ocr' ? 0.7 : 1,
                 citation: citation(documentId, generation, rawPage.page, id, bbox),
                 ...elementFingerprints('block', rawPage.page, bbox, text),
             };
@@ -172,6 +214,9 @@ export function buildCanonicalModel(pdfBytes, raw, config, dependencyFingerprint
                 rows,
                 cells,
                 text: rows.map(row => row.join(' | ')).join('\n'),
+                totalRows: rows.length,
+                totalColumns: Math.max(0, ...rows.map(row => row.length)),
+                headerRows: Number.isInteger(table.headerRows) ? Math.max(0, Math.min(rows.length, table.headerRows)) : rows.length > 1 ? 1 : 0,
                 citation: citation(documentId, generation, rawPage.page, id, tableBbox),
                 ...elementFingerprints('table', rawPage.page, tableBbox, rows),
             };
@@ -272,6 +317,8 @@ export function buildCanonicalModel(pdfBytes, raw, config, dependencyFingerprint
             addElement(pageElements, record, insertionHint(canonicalBlocks, bbox, index));
         });
 
+        pageWarnings = dedupeRecords(pageWarnings);
+        page.warnings = pageWarnings;
         const finalized = finalizePageElements(pageElements);
         page.elementIds = finalized.map(element => element.id);
         elements.push(...finalized);
@@ -295,7 +342,7 @@ export function buildCanonicalModel(pdfBytes, raw, config, dependencyFingerprint
         pages,
         elements,
         assets,
-        warnings: modelWarnings,
+        warnings: dedupeRecords(modelWarnings),
         createdAt: new Date().toISOString(),
     };
 }
@@ -330,6 +377,6 @@ export function mergeCanonicalModels(current, incoming) {
         assets: [...assets.values()].sort((a, b) => a.id.localeCompare(b.id)),
         processedPages: pages.size,
         partial: incoming.partial,
-        warnings: [...current.warnings, ...incoming.warnings],
+        warnings: dedupeRecords([...current.warnings, ...incoming.warnings]),
     };
 }

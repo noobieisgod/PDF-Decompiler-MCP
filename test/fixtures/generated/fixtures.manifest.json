@@ -78,6 +78,34 @@
         "errorCode": "PDF_PASSWORD_REQUIRED"
       }
     },
+    "image-ocr.pdf": {
+      "sha256": "9fc176149fc1726063993941b5b8447cbecd1985ef91c678549eaa9494300b34",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "image ocr",
+      "ocrRequired": true,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
     "image-only.pdf": {
       "sha256": "d5792f57112d30420dc70298a3bd42273ee1a88662414fe72074e552e05c9f09",
       "generated": true,
@@ -479,6 +507,34 @@
         ]
       }
     },
+    "multiple-image-ocr.pdf": {
+      "sha256": "246a20563325e3ec634504c232da6f9c273a41200d8170ab9512aece45aa4823",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "multiple image ocr",
+      "ocrRequired": true,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
+      }
+    },
     "narrow-layout.pdf": {
       "sha256": "33324a41c12d03e9a47c8f9829f0c0782d30ed6c1ee455f1d9ee5c850e7d27d8",
       "generated": true,
@@ -779,6 +835,34 @@
         ],
         "errorCode": null,
         "ocrText": null
+      }
+    },
+    "semantic-blocks.pdf": {
+      "sha256": "bc93f42734044de84a5fc87fca0fd9460a8d9026b10abab8b2fabd4b5e0c899b",
+      "generated": true,
+      "packageAllowed": false,
+      "purpose": "semantic blocks",
+      "ocrRequired": false,
+      "expected": {
+        "pageClassifications": [
+          "text",
+          "dense_text"
+        ],
+        "visualTypes": [
+          "none",
+          "vector"
+        ],
+        "elementTypes": [
+          "block"
+        ],
+        "boundingBoxesRequired": true,
+        "bboxContract": {
+          "coordinateSpace": "displayed_page_points",
+          "tolerancePt": 1,
+          "withinPage": true
+        },
+        "warnings": [],
+        "errorCode": null
       }
     },
     "table-merged-header.pdf": {

@@ -16,15 +16,17 @@ test('no-cache mode supports the complete multi-call API and cleans only the clo
     t.after(() => manager.close());
     const first = await manager.open({ source: firstPath, pages: [{ start: 1, end: 1 }] });
     const second = await manager.open({ source: secondPath });
-    assert.equal(first.complete, false);
+    assert.equal(first.completion.documentComplete, false);
+    assert.equal(first.completion.requestedScopeComplete, true);
+    assert.equal(first.completion.resultComplete, false);
     assert.ok(first.nextCursor);
     assert.equal((await manager.search({ ...first, query: 'Alpha' })).results[0].page, 1);
     assert.equal((await manager.getPages({ ...first, pages: [1] })).elements[0].citation.extractionFingerprint, first.extractionFingerprint);
     const continued = await manager.open({ ...first, cursor: first.nextCursor });
-    assert.equal(continued.complete, true);
+    assert.equal(continued.completion.documentComplete, true);
     assert.equal(continued.processedPages, 2);
     const element = (await manager.getPages({ ...continued, pages: [2] })).elements[0];
-    assert.equal((await manager.getElement({ ...continued, elementId: element.id })).id, element.id);
+    assert.equal((await manager.getElement({ ...continued, elementId: element.id })).element.id, element.id);
     await assert.rejects(manager.getElement({ ...continued, elementId: 'block:2:999' }), { code: 'stale_reference' });
     const rendered = await manager.renderPage({ ...continued, page: 1, format: 'auto', maxDimension: 320 });
     assert.equal(rendered.extractionFingerprint, continued.extractionFingerprint);
@@ -76,4 +78,28 @@ test('refresh replaces only an inactive persistent generation', async t => {
     const refreshed = await manager.open({ source, refresh: true });
     assert.equal(refreshed.cacheHit, false);
     assert.equal(refreshed.extractionFingerprint, opened.extractionFingerprint);
+});
+
+test('requestedScopeComplete reports extraction state while resultComplete reports retrieval pagination', async t => {
+    const root = path.resolve('test/fixtures/generated');
+    const { config } = await temporaryConfig(t, { cacheMode: 'none', allowRoots: [root] });
+    const manager = await new DocumentManager(config).init();
+    t.after(() => manager.close());
+    const opened = await manager.open({ source: path.join(root, 'oversized-content.pdf') });
+    const page = await manager.getPages({ ...opened, pages: [1, 2], budget: { textBlocks: 1, responseBytes: 100_000 } });
+    assert.equal(page.completion.documentComplete, true);
+    assert.equal(page.completion.requestedScopeComplete, true);
+    assert.equal(page.completion.resultComplete, false);
+    assert.ok(page.nextCursor);
+    await assert.rejects(manager.getPages({ ...opened, pages: [2, 1], budget: { textBlocks: 1, responseBytes: 100_000 }, cursor: page.nextCursor }), { code: 'changed_cursor_arguments' });
+    await assert.rejects(manager.getPages({ ...opened, pages: [1, 2], outputFormat: 'markdown', budget: { textBlocks: 1, responseBytes: 100_000 }, cursor: page.nextCursor }), { code: 'changed_cursor_arguments' });
+    const ids = page.elements.map(element => element.id);
+    let cursor = page.nextCursor;
+    while (cursor) {
+        const next = await manager.getPages({ ...opened, pages: [1, 2], budget: { textBlocks: 1, responseBytes: 100_000 }, cursor });
+        assert.ok(next.elements.length || next.omissions.length);
+        ids.push(...next.elements.map(element => element.id));
+        cursor = next.nextCursor;
+    }
+    assert.equal(new Set(ids).size, ids.length);
 });

@@ -75,6 +75,20 @@
         ]
       }
     },
+    "outputFormat": {
+      "type": "string",
+      "enum": [
+        "structured",
+        "markdown"
+      ]
+    },
+    "tableDetail": {
+      "type": "string",
+      "enum": [
+        "compact",
+        "full"
+      ]
+    },
     "cursor": {
       "type": "string",
       "minLength": 1

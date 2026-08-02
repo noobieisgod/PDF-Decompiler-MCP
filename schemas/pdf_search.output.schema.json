@@ -142,6 +142,77 @@
                       "bbox"
                     ],
                     "additionalProperties": false
+                  },
+                  "citations": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "documentId": {
+                          "type": "string",
+                          "pattern": "^doc_[a-f0-9]{64}$"
+                        },
+                        "extractionFingerprint": {
+                          "type": "string",
+                          "pattern": "^[a-f0-9]{64}$"
+                        },
+                        "pageId": {
+                          "type": "string",
+                          "pattern": "^page:\\d+$"
+                        },
+                        "elementId": {
+                          "type": "string",
+                          "minLength": 1
+                        },
+                        "bbox": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "x": {
+                                  "type": "number"
+                                },
+                                "y": {
+                                  "type": "number"
+                                },
+                                "width": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                },
+                                "height": {
+                                  "type": "number",
+                                  "exclusiveMinimum": 0
+                                }
+                              },
+                              "required": [
+                                "x",
+                                "y",
+                                "width",
+                                "height"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "documentId",
+                        "extractionFingerprint",
+                        "pageId",
+                        "elementId",
+                        "bbox"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "contributingElementIds": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
                   }
                 },
                 "required": [
@@ -156,123 +227,12 @@
                 ],
                 "additionalProperties": false
               }
-            },
-            "warnings": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "code": {
-                    "type": "string",
-                    "minLength": 1
-                  },
-                  "message": {
-                    "type": "string"
-                  },
-                  "page": {
-                    "type": "integer",
-                    "exclusiveMinimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "elementId": {
-                    "type": "string"
-                  },
-                  "sourceId": {
-                    "anyOf": [
-                      {
-                        "type": "string"
-                      },
-                      {
-                        "type": "null"
-                      }
-                    ]
-                  },
-                  "subtype": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "code"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "omissions": {
-              "type": "array",
-              "items": {
-                "type": "object",
-                "properties": {
-                  "id": {
-                    "type": "string"
-                  },
-                  "reason": {
-                    "type": "string"
-                  }
-                },
-                "required": [
-                  "id",
-                  "reason"
-                ],
-                "additionalProperties": false
-              }
-            },
-            "budget": {
-              "type": "object",
-              "properties": {
-                "configured": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {
-                    "type": "number"
-                  }
-                },
-                "usage": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {
-                    "type": "number"
-                  }
-                },
-                "estimators": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {
-                    "type": "string"
-                  }
-                }
-              },
-              "required": [
-                "configured",
-                "usage",
-                "estimators"
-              ],
-              "additionalProperties": false
-            },
-            "nextCursor": {
-              "anyOf": [
-                {
-                  "type": "string"
-                },
-                {
-                  "type": "null"
-                }
-              ]
             }
           },
           "required": [
             "query",
             "strategy",
-            "results",
-            "warnings",
-            "omissions",
-            "budget",
-            "nextCursor"
+            "results"
           ],
           "additionalProperties": false
         },
@@ -341,6 +301,37 @@
                     "retryable",
                     "requiresPassword",
                     "requiresConfigurationChange"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "MARKDOWN_EXPORT_TOO_LARGE",
+                        "MARKDOWN_SERIALIZATION_TIMEOUT",
+                        "MARKDOWN_SERIALIZATION_MEMORY_LIMIT",
+                        "MARKDOWN_CACHE_WRITE_FAILED",
+                        "MARKDOWN_CHECKSUM_FAILED",
+                        "MARKDOWN_SERIALIZATION_FAILED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
                   ],
                   "additionalProperties": false
                 },
@@ -590,6 +581,26 @@
           "type": "null"
         }
       ]
+    },
+    "completion": {
+      "type": "object",
+      "properties": {
+        "documentComplete": {
+          "type": "boolean"
+        },
+        "requestedScopeComplete": {
+          "type": "boolean"
+        },
+        "resultComplete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "documentComplete",
+        "requestedScopeComplete",
+        "resultComplete"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -603,7 +614,8 @@
     "diagnostics",
     "omissions",
     "budget",
-    "nextCursor"
+    "nextCursor",
+    "completion"
   ],
   "additionalProperties": false,
   "$id": "https://github.com/noobieisgod/PDF-Decompiler-MCP/schemas/pdf_search.output.schema.json"

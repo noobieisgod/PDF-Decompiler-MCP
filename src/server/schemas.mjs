@@ -48,13 +48,36 @@ const ElementBase = {
     ...Fingerprints,
 };
 
+export const OcrSourceSchema = z.discriminatedUnion('scope', [
+    z.object({ scope: z.literal('page'), figureId: z.null(), regionId: z.string().nullable(), bbox: NullableBoundingBoxSchema }),
+    z.object({ scope: z.literal('image'), figureId: z.string().nullable(), regionId: z.string().nullable(), bbox: NullableBoundingBoxSchema }),
+]);
+
 export const BlockElementSchema = z.object({
     ...ElementBase,
     type: z.literal('block'),
-    role: z.enum(['heading', 'text', 'list', 'ocr']),
+    role: z.enum(['heading', 'text', 'list', 'code']),
     text: z.string(),
+    textSource: z.enum(['native', 'ocr']),
+    headingLevel: z.number().int().min(1).max(6).nullable(),
+    roleConfidence: z.number().finite().min(0).max(1),
+    listKind: z.enum(['ordered', 'unordered']).nullable(),
+    listLevel: z.number().int().min(0).max(32).nullable(),
+    listStart: z.number().int().min(1).max(1_000_000).nullable(),
+    listOrdinal: z.number().int().min(1).max(1_000_000).nullable(),
+    listItemId: z.string().nullable(),
+    listContinuation: z.boolean(),
+    codeLanguage: z.string().regex(/^[a-z0-9_+-]{1,32}$/).nullable(),
+    ocrSource: OcrSourceSchema.nullable(),
     extractionMethod: z.string(),
     confidence: z.number().min(0).max(1),
+}).superRefine((block, context) => {
+    if ((block.role === 'heading') !== (block.headingLevel !== null)) context.addIssue({ code: 'custom', message: 'headingLevel must be set only for headings' });
+    const listFields = [block.listKind, block.listLevel, block.listStart, block.listOrdinal, block.listItemId];
+    if (block.role !== 'list' && (listFields.some(value => value !== null) || block.listContinuation)) context.addIssue({ code: 'custom', message: 'List metadata is valid only for list blocks' });
+    if (block.role === 'list' && (block.listKind === null || block.listLevel === null || block.listItemId === null)) context.addIssue({ code: 'custom', message: 'List blocks require kind, level, and item identity' });
+    if ((block.role === 'code') !== (block.codeLanguage !== null) && block.role !== 'code') context.addIssue({ code: 'custom', message: 'Code metadata is valid only for code blocks' });
+    if ((block.textSource === 'ocr') !== (block.ocrSource !== null)) context.addIssue({ code: 'custom', message: 'OCR source must match textSource' });
 });
 
 const TableCellSchema = z.object({
@@ -65,6 +88,8 @@ const TableCellSchema = z.object({
     columnSpan: z.number().int().positive(),
     text: z.string(),
     bbox: NullableBoundingBoxSchema,
+    contextRow: z.boolean().optional(),
+    visibleIntersection: z.object({ rowStart: z.number().int().positive(), rowEnd: z.number().int().positive(), columnStart: z.number().int().positive(), columnEnd: z.number().int().positive() }).optional(),
 });
 
 export const TableElementSchema = z.object({
@@ -73,6 +98,10 @@ export const TableElementSchema = z.object({
     rows: z.array(z.array(z.string())),
     cells: z.array(TableCellSchema),
     text: z.string(),
+    totalRows: z.number().int().nonnegative(),
+    totalColumns: z.number().int().nonnegative(),
+    headerRows: z.number().int().nonnegative(),
+    preview: z.object({ rowStart: z.number().int().positive(), rowEnd: z.number().int().nonnegative(), columnStart: z.number().int().positive(), columnEnd: z.number().int().nonnegative(), partial: z.boolean() }).optional(),
 });
 
 export const AssetSchema = z.object({
@@ -167,8 +196,13 @@ export const PublicParserErrorSchema = z.object({
     requiresConfigurationChange: z.boolean(),
     diagnosticId: z.string().optional(),
 });
-const GeneralErrorSchema = z.object({ code: z.string().min(1).refine(code => !code.startsWith('PDF_'), 'Parser codes must be enumerated'), message: z.string(), details: z.record(z.string(), z.unknown()).optional() });
-export const PublicErrorSchema = z.union([PublicParserErrorSchema, GeneralErrorSchema]);
+export const MarkdownErrorCodeSchema = z.enum([
+    'MARKDOWN_EXPORT_TOO_LARGE', 'MARKDOWN_SERIALIZATION_TIMEOUT', 'MARKDOWN_SERIALIZATION_MEMORY_LIMIT',
+    'MARKDOWN_CACHE_WRITE_FAILED', 'MARKDOWN_CHECKSUM_FAILED', 'MARKDOWN_SERIALIZATION_FAILED',
+]);
+const MarkdownErrorSchema = z.object({ code: MarkdownErrorCodeSchema, message: z.string(), details: z.record(z.string(), z.unknown()).optional() });
+const GeneralErrorSchema = z.object({ code: z.string().min(1).refine(code => !code.startsWith('PDF_') && !code.startsWith('MARKDOWN_'), 'Namespaced codes must be enumerated'), message: z.string(), details: z.record(z.string(), z.unknown()).optional() });
+export const PublicErrorSchema = z.union([PublicParserErrorSchema, MarkdownErrorSchema, GeneralErrorSchema]);
 export const WarningSchema = z.object({
     code: z.string().min(1), message: z.string().optional(), page: z.number().int().positive().optional(),
     elementId: z.string().optional(), sourceId: z.string().nullable().optional(), subtype: z.string().optional(),
@@ -204,9 +238,15 @@ export const SearchSchema = z.object({
 export const GetPagesSchema = z.object({
     ...DocumentReference, pages: z.array(z.number().int().min(1)).min(1).optional(), pageRanges: z.array(PageInterval).min(1).optional(),
     mode: z.enum(['text', 'balanced', 'fidelity']).optional(), includeElementTypes: z.array(z.enum(['block', 'table', 'figure', 'annotation', 'link'])).optional(),
-    excludeElementTypes: z.array(z.enum(['block', 'table', 'figure', 'annotation', 'link'])).optional(), cursor: z.string().min(1).optional(), budget: BudgetSchema,
+    excludeElementTypes: z.array(z.enum(['block', 'table', 'figure', 'annotation', 'link'])).optional(),
+    outputFormat: z.enum(['structured', 'markdown']).optional(), tableDetail: z.enum(['compact', 'full']).optional(),
+    cursor: z.string().min(1).optional(), budget: BudgetSchema,
 });
-export const GetElementSchema = z.object({ ...DocumentReference, elementId: z.string().min(1) });
+export const TableSelectionSchema = z.object({
+    rowStart: z.number().int().min(1).optional(), rowEnd: z.number().int().min(1).optional(),
+    columnStart: z.number().int().min(1).optional(), columnEnd: z.number().int().min(1).optional(), includeHeaders: z.boolean().optional(),
+});
+export const GetElementSchema = z.object({ ...DocumentReference, elementId: z.string().min(1), tableSelection: TableSelectionSchema.optional(), cursor: z.string().min(1).optional(), budget: BudgetSchema });
 export const RenderPageSchema = z.object({
     ...DocumentReference, page: z.number().int().min(1), bbox: z.union([BoundingBoxSchema, LegacyBoundingBoxSchema]).optional(),
     format: z.enum(['auto', 'png', 'jpeg']).optional(), maxDimension: z.number().int().min(64).max(4096).optional(),
@@ -223,13 +263,13 @@ const CacheStatusSchema = z.object({
 const BudgetResultSchema = z.object({ configured: z.record(z.string(), z.number()), usage: z.record(z.string(), z.number()), estimators: z.record(z.string(), z.string()) });
 const SearchResultSchema = z.object({
     id: z.string(), page: z.number().int().positive(), type: z.string(), readingOrder: z.number().int(), score: z.number(),
-    matchedTerms: z.array(z.string()), snippet: z.string(), citation: CitationSchema,
+    matchedTerms: z.array(z.string()), snippet: z.string(), citation: CitationSchema, citations: z.array(CitationSchema).optional(), contributingElementIds: z.array(z.string()).optional(),
 });
 const RenderAssetSchema = z.object({
     id: z.string(), kind: z.string(), documentId: DocumentIdSchema, extractionFingerprint: ExtractionFingerprintSchema,
     mimeType: z.string(), width: z.number().nonnegative(), height: z.number().nonnegative(), data: z.string().optional(),
     sha256: z.string().regex(/^[a-f0-9]{64}$/), uri: z.string().startsWith('pdf-decompiler://'),
-    enforcement: z.record(z.string(), z.string()), budget: BudgetResultSchema,
+    enforcement: z.record(z.string(), z.string()),
 });
 
 const MetadataSchema = z.object({
@@ -255,25 +295,33 @@ const PageSchema = z.object({
 const OpenDataSchema = z.object({
     documentId: DocumentIdSchema, extractionFingerprint: ExtractionFingerprintSchema, sourceId: SourceIdSchema,
     sourceDescriptor: SourceDescriptorSchema, totalPages: z.number().int().positive(), processedPages: z.number().int().nonnegative(),
-    complete: z.boolean(), nextCursor: z.string().nullable(), cacheHit: z.boolean(), cache: CacheStatusSchema, diagnostics: DiagnosticSchema.nullable(),
+    cacheHit: z.boolean(), cache: CacheStatusSchema,
 });
 const DocumentInfoDataSchema = z.object({
-    schemaVersion: z.literal('3.0.0'), canonicalFormatVersion: z.literal(2), extractionRevision: z.literal(2),
+    schemaVersion: z.literal('3.0.0'), canonicalFormatVersion: z.literal(3), extractionRevision: z.literal(3),
     documentId: DocumentIdSchema, pdfSha256: z.string().regex(/^[a-f0-9]{64}$/), extractionFingerprint: ExtractionFingerprintSchema,
     dependencyFingerprint: z.string().regex(/^[a-f0-9]{64}$/), metadata: MetadataSchema, outline: z.array(OutlineItemSchema),
     totalPages: z.number().int().positive(), processedPages: z.number().int().nonnegative(), partial: PartialSchema.nullable(),
-    pages: z.array(PageSchema), warnings: z.array(WarningSchema), createdAt: z.string().datetime(), activeSources: z.array(SourceDescriptorSchema),
+    pages: z.array(PageSchema), createdAt: z.string().datetime(), activeSources: z.array(SourceDescriptorSchema),
     counts: z.object({ block: z.number().int().nonnegative(), table: z.number().int().nonnegative(), figure: z.number().int().nonnegative(), annotation: z.number().int().nonnegative(), link: z.number().int().nonnegative() }),
     cache: CacheStatusSchema, resourceLifetime: z.enum(['until_generation_deleted_or_evicted', 'owning_process_and_document_lifetime', 'active_document_lifetime']),
+    exports: z.object({ markdown: z.object({ status: z.enum(['ready', 'generatable', 'partial_generation', 'unavailable_limit']), resourceUri: z.string().startsWith('pdf-decompiler://').nullable() }) }),
 });
 const SearchDataSchema = z.object({
     query: z.string(), strategy: z.enum(['full_text', 'semantic', 'hybrid']), results: z.array(SearchResultSchema),
-    warnings: z.array(WarningSchema), omissions: z.array(OmissionSchema), budget: BudgetResultSchema, nextCursor: z.string().nullable(),
 });
-const PagesDataSchema = z.object({
-    mode: z.enum(['text', 'balanced', 'fidelity']), pages: z.array(z.number().int().positive()), elements: z.array(ElementSchema),
-    citations: z.array(CitationSchema), omissions: z.array(OmissionSchema), budget: BudgetResultSchema, nextCursor: z.string().nullable(),
+const StructuredPagesDataSchema = z.object({
+    outputFormat: z.literal('structured'), mode: z.enum(['text', 'balanced', 'fidelity']), pages: z.array(z.number().int().positive()), elements: z.array(ElementSchema),
 });
+const MarkdownPagesDataSchema = z.object({
+    outputFormat: z.literal('markdown'), markdownFormatVersion: z.literal(1), pages: z.array(z.number().int().positive()), markdown: z.string(), resourceUris: z.array(z.string().startsWith('pdf-decompiler://')),
+});
+const PagesDataSchema = z.discriminatedUnion('outputFormat', [StructuredPagesDataSchema, MarkdownPagesDataSchema]);
+const TableSelectionResultSchema = z.object({
+    rowStart: z.number().int().positive(), rowEnd: z.number().int().positive(), columnStart: z.number().int().positive(), columnEnd: z.number().int().positive(),
+    contextRows: z.array(z.number().int().positive()), partial: z.boolean(), totalRows: z.number().int().nonnegative(), totalColumns: z.number().int().nonnegative(),
+});
+const ElementDataSchema = z.object({ element: ElementSchema, tableSelection: TableSelectionResultSchema.nullable() });
 const CloseDataSchema = z.object({
     closed: z.boolean(), sourceId: SourceIdSchema, remainingHandles: z.number().int().nonnegative(), cacheDeleted: z.boolean(), deletionVerified: z.boolean(),
 });
@@ -284,6 +332,7 @@ function envelope(operation, dataSchema) {
         extractionFingerprint: ExtractionFingerprintSchema.nullable(), data: z.union([dataSchema, ErrorDataSchema]),
         citations: z.array(CitationSchema), warnings: z.array(WarningSchema), diagnostics: DiagnosticSchema.nullable(),
         omissions: z.array(OmissionSchema), budget: BudgetResultSchema.nullable(), nextCursor: z.string().nullable(),
+        completion: z.object({ documentComplete: z.boolean(), requestedScopeComplete: z.boolean(), resultComplete: z.boolean() }),
     });
 }
 
@@ -292,7 +341,7 @@ export const OutputSchemas = {
     pdf_document_info: envelope('pdf_document_info', DocumentInfoDataSchema),
     pdf_search: envelope('pdf_search', SearchDataSchema),
     pdf_get_pages: envelope('pdf_get_pages', PagesDataSchema),
-    pdf_get_element: envelope('pdf_get_element', ElementSchema),
+    pdf_get_element: envelope('pdf_get_element', ElementDataSchema),
     pdf_render_page: envelope('pdf_render_page', RenderAssetSchema),
     pdf_close: envelope('pdf_close', CloseDataSchema),
 };

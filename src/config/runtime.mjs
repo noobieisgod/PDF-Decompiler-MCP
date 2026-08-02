@@ -23,6 +23,12 @@ function number(value, name, { min = 1 } = {}) {
     return parsed;
 }
 
+function boundedNumber(value, name, defaultValue, hardMaximum) {
+    const parsed = number(value ?? defaultValue, name);
+    if (parsed > hardMaximum) throw new Error(`${name} must not exceed ${hardMaximum}`);
+    return parsed;
+}
+
 function defaultCacheDir() {
     if (process.platform === 'win32') {
         return path.join(process.env.LOCALAPPDATA || os.tmpdir(), 'pdf-decompiler-mcp');
@@ -66,6 +72,15 @@ export function loadConfig(overrides = {}) {
             allowDownload: overrides.semanticAllowDownload ?? parseBoolean(env.PDF_DECOMPILER_SEMANTIC_ALLOW_DOWNLOAD),
         },
         cursorTtlMs: number(overrides.cursorTtlMs ?? env.PDF_DECOMPILER_CURSOR_TTL_MS ?? 3_600_000, 'cursorTtlMs'),
+        markdown: {
+            maxBytes: boundedNumber(overrides.markdownMaxBytes ?? env.PDF_DECOMPILER_MARKDOWN_MAX_BYTES, 'markdown.maxBytes', 16 * 1024 * 1024, 64 * 1024 * 1024),
+            timeoutMs: boundedNumber(overrides.markdownTimeoutMs ?? env.PDF_DECOMPILER_MARKDOWN_TIMEOUT_MS, 'markdown.timeoutMs', 30_000, 120_000),
+            maxBufferBytes: boundedNumber(overrides.markdownMaxBufferBytes ?? env.PDF_DECOMPILER_MARKDOWN_MAX_BUFFER_BYTES, 'markdown.maxBufferBytes', 8 * 1024 * 1024, 32 * 1024 * 1024),
+            maxElements: boundedNumber(overrides.markdownMaxElements ?? env.PDF_DECOMPILER_MARKDOWN_MAX_ELEMENTS, 'markdown.maxElements', 100_000, 500_000),
+            maxTableRows: boundedNumber(overrides.markdownMaxTableRows ?? env.PDF_DECOMPILER_MARKDOWN_MAX_TABLE_ROWS, 'markdown.maxTableRows', 50_000, 250_000),
+            maxTableCells: boundedNumber(overrides.markdownMaxTableCells ?? env.PDF_DECOMPILER_MARKDOWN_MAX_TABLE_CELLS, 'markdown.maxTableCells', 500_000, 2_000_000),
+            maxCacheEntryBytes: boundedNumber(overrides.markdownMaxCacheEntryBytes ?? env.PDF_DECOMPILER_MARKDOWN_MAX_CACHE_ENTRY_BYTES, 'markdown.maxCacheEntryBytes', 16 * 1024 * 1024, 64 * 1024 * 1024),
+        },
         debug: overrides.debug ?? parseBoolean(env.PDF_DECOMPILER_DEBUG),
     };
     return config;

@@ -43,7 +43,7 @@ test('all seven tools expose input and output schemas and complete the new workf
     const element = pages.structuredContent.data.elements[0];
     assert.equal(element.citation.extractionFingerprint, reference.extractionFingerprint);
     const one = await client.callTool({ name: 'pdf_get_element', arguments: { ...reference, elementId: element.id } });
-    assert.equal(one.structuredContent.data.id, element.id);
+    assert.equal(one.structuredContent.data.element.id, element.id);
 
     const linked = await client.callTool({ name: 'pdf_render_page', arguments: { ...reference, page: 1, maxDimension: 256, imageDelivery: 'auto' } });
     const resource = linked.content.find(item => item.type === 'resource_link');

@@ -1,0 +1,37 @@
+import assert from 'node:assert/strict';
+import fs from 'node:fs/promises';
+import path from 'node:path';
+import test from 'node:test';
+import { CacheManager } from '../src/cache/cache-manager.mjs';
+import { sha256 } from '../src/core/crypto.mjs';
+import { fullExportIdentity } from '../src/markdown/serializer.mjs';
+import { buildCanonicalModel } from '../src/model/canonical.mjs';
+import { buildBm25 } from '../src/search/bm25.mjs';
+import { rawDocument, temporaryConfig } from './helpers.mjs';
+
+test('canonical, BM25, and Markdown derivative invalidation layers remain independent', async t => {
+    const { root, config } = await temporaryConfig(t, { cacheMode: 'persistent' });
+    const cache = await new CacheManager(config).init();
+    t.after(() => cache.close());
+    const model = buildCanonicalModel(Buffer.from('%PDF-derivatives'), rawDocument(1), { extractorVersion: '3.0.0', maxPages: 5000, ocrPolicy: 'auto' }, 'deps');
+    await cache.saveGeneration(model, Buffer.from('%PDF-derivatives'), buildBm25(model));
+    const firstFingerprint = fullExportIdentity(model.extractionFingerprint, { compactTableRows: 5 });
+    assert.equal(firstFingerprint, fullExportIdentity(model.extractionFingerprint, { compactTableRows: 500 }));
+    const source = path.join(root, 'export.md');
+    const bytes = Buffer.from('# Complete export\n');
+    await fs.writeFile(source, bytes);
+    await cache.saveDerivedMarkdown(model.documentId, model.extractionFingerprint, firstFingerprint, source, { bytes: bytes.length, sha256: sha256(bytes) });
+    assert.equal((await cache.loadDerivedMarkdown(model.documentId, model.extractionFingerprint, firstFingerprint)).text, bytes.toString());
+    const changedSerializer = fullExportIdentity(model.extractionFingerprint, { escapingRevision: 2 });
+    assert.equal(await cache.loadDerivedMarkdown(model.documentId, model.extractionFingerprint, changedSerializer), null);
+    await assert.rejects(cache.saveDerivedMarkdown(model.documentId, model.extractionFingerprint, changedSerializer, source, { bytes: bytes.length, sha256: '0'.repeat(64) }), { code: 'MARKDOWN_CHECKSUM_FAILED' });
+    const bm25Path = path.join(cache.generationPath(model.documentId, model.extractionFingerprint), 'bm25.json');
+    await fs.writeFile(bm25Path, JSON.stringify({ version: 1 }));
+    const loaded = await cache.loadGeneration(model.documentId, model.extractionFingerprint);
+    assert.equal(loaded.model.documentId, model.documentId);
+    assert.equal(loaded.bm25, null);
+    assert.ok(await cache.loadDerivedMarkdown(model.documentId, model.extractionFingerprint, firstFingerprint));
+    const changedCanonical = buildCanonicalModel(Buffer.from('%PDF-derivatives'), rawDocument(1), { extractorVersion: '3.0.1', maxPages: 5000, ocrPolicy: 'auto' }, 'deps');
+    assert.notEqual(changedCanonical.extractionFingerprint, model.extractionFingerprint);
+    assert.equal(await cache.loadDerivedMarkdown(changedCanonical.documentId, changedCanonical.extractionFingerprint, firstFingerprint), null);
+});

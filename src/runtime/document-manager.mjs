@@ -6,10 +6,13 @@ import { fingerprint, sha256 } from '../core/crypto.mjs';
 import { PdfDecompilerError } from '../core/errors.mjs';
 import { buildCanonicalModel, extractionFingerprint, indexModel, mergeCanonicalModels, modelView } from '../model/canonical.mjs';
 import { buildBm25, searchBm25 } from '../search/bm25.mjs';
+import { MARKDOWN_FORMAT_VERSION, MARKDOWN_SERIALIZER_REVISION, serializeElementMarkdown, serializePagedMarkdown } from '../markdown/serializer.mjs';
+import { getFullMarkdownExport, markdownResourceUri } from '../markdown/export.mjs';
 import { buildSemanticIndex, createEmbedder, reciprocalRankFusion, searchSemantic } from '../search/semantic.mjs';
 import { loadPdfSource } from '../security/source.mjs';
-import { applyResultBudget, resolveBudget } from './budget.mjs';
+import { applyFairPageBudget, applyResultBudget, HARD_BUDGET, normalizePageOrder, resolveBudget } from './budget.mjs';
 import { CursorCodec } from './cursor.mjs';
+import { selectTable } from './table-selection.mjs';
 import { runExtractionSubprocess, runRenderSubprocess } from './subprocess.mjs';
 import { timingMark } from './timing.mjs';
 
@@ -27,6 +30,64 @@ function sortElements(elements) {
     return [...elements].sort((a, b) => a.page - b.page || a.readingOrder - b.readingOrder || a.id.localeCompare(b.id));
 }
 
+function completeDocument(model) {
+    return model.processedPages === model.totalPages && !model.partial;
+}
+
+function requestedPagesComplete(model, pages) {
+    const processed = new Set(model.pages.map(page => page.number));
+    return pages.every(page => processed.has(page));
+}
+
+function dedupe(values) {
+    return [...new Map(values.map(value => [JSON.stringify(value), value])).values()];
+}
+
+function pageRanges(pages) {
+    const sorted = [...new Set(pages)].sort((a, b) => a - b);
+    const ranges = [];
+    for (const page of sorted) {
+        const last = ranges.at(-1);
+        if (last && page === last[1] + 1) last[1] = page;
+        else ranges.push([page, page]);
+    }
+    return ranges.map(([start, end]) => start === end ? String(start) : `${start}-${end}`).join(',');
+}
+
+function summarizePageWarnings(pages) {
+    const groups = new Map();
+    for (const page of pages) for (const warning of page.warnings || []) {
+        const { page: _page, ...base } = warning;
+        const key = JSON.stringify(base);
+        if (!groups.has(key)) groups.set(key, { base, pages: [] });
+        groups.get(key).pages.push(page.number);
+    }
+    return [...groups.values()].map(group => group.pages.length === 1
+        ? { ...group.base, page: group.pages[0] }
+        : { ...group.base, message: `${group.base.message ? `${group.base.message} ` : ''}Affected pages: ${pageRanges(group.pages)}.` });
+}
+
+function compactTable(table) {
+    const rows = table.rows.slice(0, 6).map(row => row.slice(0, 8));
+    return {
+        ...table,
+        rows,
+        cells: table.cells.filter(cell => cell.row <= 6 && cell.column <= 8),
+        text: rows.map(row => row.join(' | ')).join('\n'),
+        preview: { rowStart: 1, rowEnd: rows.length, columnStart: 1, columnEnd: Math.max(0, ...rows.map(row => row.length)), partial: table.totalRows > rows.length || table.totalColumns > 8 },
+    };
+}
+
+function buildBm25Safely(model, debug = false) {
+    try {
+        return buildBm25(model);
+    } catch (error) {
+        const diagnosticId = randomUUID();
+        if (debug) console.error(`[pdf-index:${diagnosticId}]`, error?.stack || error);
+        throw new PdfDecompilerError('INDEX_BUILD_FAILED', 'The extracted document could not be indexed.', { stage: 'bm25', retryable: true, diagnosticId });
+    }
+}
+
 function missingPageIntervals(totalPages, processedPages) {
     const present = new Set(processedPages);
     const intervals = [];
@@ -40,6 +101,17 @@ function missingPageIntervals(totalPages, processedPages) {
         }
     }
     return intervals;
+}
+
+function openScopePages(intervals, totalPages) {
+    if (!intervals?.length) return Array.from({ length: totalPages }, (_, index) => index + 1);
+    const pages = new Set();
+    for (const interval of intervals) {
+        const start = interval.start ?? 1;
+        const end = interval.end ?? totalPages;
+        for (let page = start; page <= Math.min(end, totalPages); page += 1) pages.add(page);
+    }
+    return [...pages];
 }
 
 export class DocumentManager {
@@ -63,6 +135,13 @@ export class DocumentManager {
 
     generationForCurrentConfig(config = this.config) {
         return extractionFingerprint(config, dependencyFingerprint);
+    }
+
+    async bm25ForCached(cached) {
+        if (cached.bm25?.version === 2) return cached.bm25;
+        const bm25 = buildBm25Safely(cached.model, this.config.debug);
+        await this.cache.saveBm25Index(cached.model.documentId, cached.model.extractionFingerprint, bm25);
+        return bm25;
     }
 
     async activate(model, pdfBytes, bm25, semantic = null, { persisted = false, extractionConfig = this.config } = {}) {
@@ -128,14 +207,14 @@ export class DocumentManager {
             if (active.closing) throw new PdfDecompilerError('closed_document', 'The document generation is closing.');
             if (args.refresh) throw new PdfDecompilerError('active_generation', 'Close the active extraction generation before refreshing it.');
             this.addSourceHandle(active, descriptor);
-            return this.openResult(active, descriptor, { cacheHit: true });
+            return this.openResult(active, descriptor, { cacheHit: true, requestedPages: openScopePages(args.pages, active.model.totalPages) });
         }
         if (!args.refresh && this.config.cache.mode === 'persistent') {
             const cached = await this.cache.loadGeneration(documentId, generation);
             if (cached) {
-                const state = await this.activate(cached.model, cached.pdfBytes, cached.bm25 || buildBm25(cached.model), cached.semantic, { persisted: true, extractionConfig });
+                const state = await this.activate(cached.model, cached.pdfBytes, await this.bm25ForCached(cached), cached.semantic, { persisted: true, extractionConfig });
                 this.addSourceHandle(state, descriptor);
-                return this.openResult(state, descriptor, { cacheHit: true });
+                return this.openResult(state, descriptor, { cacheHit: true, requestedPages: openScopePages(args.pages, state.model.totalPages) });
             }
         }
         if (args.refresh && this.config.cache.mode === 'persistent' && await this.cache.generationExists(documentId, generation)) {
@@ -154,14 +233,14 @@ export class DocumentManager {
             };
         }
         const model = buildCanonicalModel(loaded.bytes, extracted.result, extractionConfig, dependencyFingerprint);
-        const bm25 = buildBm25(model);
+        const bm25 = buildBm25Safely(model, this.config.debug);
         const state = await this.activate(model, loaded.bytes, bm25, null, { extractionConfig });
         this.addSourceHandle(state, descriptor);
         state.diagnostics = extracted.diagnostics;
-        return this.openResult(state, descriptor, { cacheHit: false });
+        return this.openResult(state, descriptor, { cacheHit: false, requestedPages: openScopePages(args.pages, state.model.totalPages) });
     }
 
-    openResult(state, descriptor, { cacheHit }) {
+    openResult(state, descriptor, { cacheHit, requestedPages = [] }) {
         const nextCursor = state.model.partial?.nextPage
             ? this.cursors.encode({
                 documentId: state.model.documentId,
@@ -175,13 +254,18 @@ export class DocumentManager {
             extractionFingerprint: state.model.extractionFingerprint,
             totalPages: state.model.totalPages,
             processedPages: state.model.processedPages,
-            complete: !state.model.partial,
             nextCursor,
             cacheHit,
             sourceId: descriptor.sourceId,
             sourceDescriptor: descriptor,
             cache: this.cache.status(state.model),
             diagnostics: state.diagnostics || null,
+            warnings: summarizePageWarnings(state.model.pages),
+            completion: {
+                documentComplete: completeDocument(state.model),
+                requestedScopeComplete: requestedPagesComplete(state.model, requestedPages),
+                resultComplete: nextCursor === null,
+            },
         };
     }
 
@@ -214,7 +298,7 @@ export class DocumentManager {
                 remainingPages: missing.reduce((sum, interval) => sum + interval.end - interval.start + 1, 0),
             };
         }
-        state.bm25 = buildBm25(state.model);
+        state.bm25 = buildBm25Safely(state.model, this.config.debug);
         state.indexes = indexModel(state.model);
         state.diagnostics = extracted.diagnostics;
         if (!state.model.partial && !state.persisted) {
@@ -222,7 +306,7 @@ export class DocumentManager {
             state.leaseId = await this.cache.acquireLease(state.model.documentId, state.model.extractionFingerprint);
             state.persisted = true;
         }
-        return this.openResult(state, descriptor, { cacheHit: false });
+        return this.openResult(state, descriptor, { cacheHit: false, requestedPages: openScopePages(pages, state.model.totalPages) });
     }
 
     async requireState(documentId, generation = null) {
@@ -237,7 +321,7 @@ export class DocumentManager {
         if (this.config.cache.mode !== 'persistent') throw new PdfDecompilerError('expired_process_state', 'The process-local document state has expired.');
         const cached = await this.cache.loadGeneration(documentId, selectedGeneration);
         if (!cached) throw new PdfDecompilerError('cache_generation_missing', 'The extraction generation is unavailable.');
-        return this.activate(cached.model, cached.pdfBytes, cached.bm25 || buildBm25(cached.model), cached.semantic, { persisted: true });
+        return this.activate(cached.model, cached.pdfBytes, await this.bm25ForCached(cached), cached.semantic, { persisted: true });
     }
 
     async withOperation(documentId, generation, callback) {
@@ -259,13 +343,28 @@ export class DocumentManager {
     async documentInfo(args) {
         return this.withOperation(args.documentId, args.extractionFingerprint, async state => {
         const counts = Object.fromEntries(['block', 'table', 'figure', 'annotation', 'link'].map(type => [type, state.model.elements.filter(item => item.type === type).length]));
-        const { elements: _elements, assets: _assets, ...document } = modelView(state.model);
+        const { elements: _elements, assets: _assets, warnings, ...document } = modelView(state.model);
+        const markdownUri = markdownResourceUri(state.model);
+        const serializerFingerprint = markdownUri.split('/').at(-2);
+        const cachedMarkdown = completeDocument(state.model) ? await this.cache.loadDerivedMarkdown(state.model.documentId, state.model.extractionFingerprint, serializerFingerprint) : null;
+        const tableRows = state.model.elements.filter(element => element.type === 'table').reduce((sum, table) => sum + table.totalRows, 0);
+        const tableCells = state.model.elements.filter(element => element.type === 'table').reduce((sum, table) => sum + table.cells.length, 0);
+        const exportWithinLimits = state.model.elements.length <= this.config.markdown.maxElements
+            && tableRows <= this.config.markdown.maxTableRows && tableCells <= this.config.markdown.maxTableCells;
         return {
             ...document,
             counts,
             activeSources: [...state.handles.values()],
             cache: { ...this.cache.status(state.model), activeLeases: await this.cache.activeLeases(state.model.documentId, state.model.extractionFingerprint) },
             resourceLifetime: this.config.cache.mode === 'persistent' ? 'until_generation_deleted_or_evicted' : this.config.cache.mode === 'ephemeral' ? 'owning_process_and_document_lifetime' : 'active_document_lifetime',
+            exports: {
+                markdown: {
+                    status: cachedMarkdown ? 'ready' : !completeDocument(state.model) ? 'partial_generation' : exportWithinLimits ? 'generatable' : 'unavailable_limit',
+                    resourceUri: completeDocument(state.model) && exportWithinLimits ? markdownUri : null,
+                },
+            },
+            warnings: summarizePageWarnings(state.model.pages),
+            completion: { documentComplete: completeDocument(state.model), requestedScopeComplete: true, resultComplete: true },
         };
         });
     }
@@ -303,32 +402,33 @@ export class DocumentManager {
             argumentsValue: cursorArguments,
         }) : 0;
         const bounded = applyResultBudget(results, resolveBudget(args.budget), start);
+        const nextCursor = bounded.nextOffset === null ? null : this.cursors.encode({ documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint, operation: 'pdf_search', argumentsValue: cursorArguments, position: bounded.nextOffset });
+        const scopePages = args.pages?.length ? args.pages : Array.from({ length: state.model.totalPages }, (_, index) => index + 1);
         return {
             query: args.query,
             strategy,
             results: bounded.items,
+            citations: dedupe(bounded.items.flatMap(result => result.citations || [result.citation])),
             warnings,
             omissions: bounded.omissions,
             budget: { configured: resolveBudget(args.budget), usage: bounded.usage, estimators: { text: 'utf8_bytes_divided_by_4' } },
-            nextCursor: bounded.nextOffset === null ? null : this.cursors.encode({ documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint, operation: 'pdf_search', argumentsValue: cursorArguments, position: bounded.nextOffset }),
+            nextCursor,
+            completion: { documentComplete: completeDocument(state.model), requestedScopeComplete: requestedPagesComplete(state.model, scopePages), resultComplete: nextCursor === null },
         };
         });
     }
 
     async getPages(args) {
         return this.withOperation(args.documentId, args.extractionFingerprint, async state => {
-        const requested = new Set(args.pages || []);
-        for (const range of args.pageRanges || []) {
-            const start = range.start ?? 1;
-            const end = range.end ?? state.model.totalPages;
-            if (end < start) throw new PdfDecompilerError('invalid_page_range', 'A page range end cannot precede its start.');
-            for (let page = start; page <= Math.min(end, state.model.totalPages); page += 1) requested.add(page);
-        }
-        if (!requested.size) state.model.pages.forEach(page => requested.add(page.number));
-        if ([...requested].some(page => page > state.model.totalPages)) throw new PdfDecompilerError('page_unavailable', 'A requested page exceeds the document page count.');
+        if ((args.pages || []).some(page => page > state.model.totalPages)) throw new PdfDecompilerError('page_unavailable', 'A requested page exceeds the document page count.');
+        const requestedPages = normalizePageOrder(args.pages, args.pageRanges, state.model.totalPages, state.model.pages.map(page => page.number));
+        if (requestedPages.length > HARD_BUDGET.pages) throw new PdfDecompilerError('budget_exhausted', 'The requested page scope exceeds the hard page limit.');
+        const requested = new Set(requestedPages);
         const scoped = sortElements(state.model.elements.filter(element => requested.has(element.page)));
         let elements = scoped;
         const mode = args.mode || 'balanced';
+        const outputFormat = args.outputFormat || 'structured';
+        const tableDetail = args.tableDetail || (outputFormat === 'markdown' ? 'compact' : 'full');
         if (mode === 'text') elements = elements.filter(element => element.type !== 'figure');
         if (mode === 'balanced') elements = elements.filter(element => element.type !== 'figure' || element.caption);
         if (args.includeElementTypes?.length) {
@@ -340,23 +440,89 @@ export class DocumentManager {
             const exclude = new Set(args.excludeElementTypes);
             elements = elements.filter(element => !exclude.has(element.type));
         }
+        const resolvedBudget = resolveBudget(args.budget);
         const cursorArguments = {
-            pages: [...requested].sort((a, b) => a - b),
+            pages: requestedPages,
             mode,
+            outputFormat,
+            tableDetail,
             includeElementTypes: args.includeElementTypes || null,
             excludeElementTypes: args.excludeElementTypes || null,
-            budget: args.budget || null,
+            requestedBudget: args.budget || null,
+            hardBudgetFingerprint: fingerprint(HARD_BUDGET),
+            canonicalFormatVersion: state.model.canonicalFormatVersion,
+            extractionRevision: state.model.extractionRevision,
+            markdownFormatVersion: outputFormat === 'markdown' ? MARKDOWN_FORMAT_VERSION : null,
+            markdownSerializerRevision: outputFormat === 'markdown' ? MARKDOWN_SERIALIZER_REVISION : null,
         };
-        const start = args.cursor ? this.cursors.decode(args.cursor, { documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint, operation: 'pdf_get_pages', argumentsValue: cursorArguments }) : 0;
-        const bounded = applyResultBudget(elements, resolveBudget(args.budget), start);
-        return {
+        const position = args.cursor ? this.cursors.decode(args.cursor, {
+            documentId: state.model.documentId,
+            extractionFingerprint: state.model.extractionFingerprint,
+            operation: 'pdf_get_pages',
+            argumentsValue: cursorArguments,
+        }) : { offsets: requestedPages.map(() => 0), pageIndex: 0 };
+        const pageItems = requestedPages.map(page => ({ page, items: elements.filter(element => element.page === page) }));
+        const wireResponseBytes = Math.min(resolvedBudget.responseBytes, args._wireResponseBytes ?? resolvedBudget.responseBytes);
+        const preCapBudget = {
+            ...resolvedBudget,
+            responseBytes: Math.floor(wireResponseBytes * 0.65),
+            estimatedTokens: Math.min(resolvedBudget.estimatedTokens, Math.floor(wireResponseBytes / 4 * 0.75)),
+        };
+        const bounded = applyFairPageBudget(pageItems, preCapBudget, position, element => {
+            const value = element.type === 'table' && tableDetail === 'compact' ? compactTable(element) : element;
+            const fragment = outputFormat === 'markdown' ? serializeElementMarkdown(value, { tableDetail }) : null;
+            const encoded = outputFormat === 'markdown' ? fragment : JSON.stringify(value);
+            return {
+                value: { element: value, markdown: fragment },
+                encoded,
+                bytes: Math.ceil(Buffer.byteLength(encoded) * 1.15) + Buffer.byteLength(JSON.stringify(value.citation)) + 256,
+                counts: {
+                    textBlocks: value.type === 'block' ? 1 : 0,
+                    tables: value.type === 'table' ? 1 : 0,
+                    figures: value.type === 'figure' ? 1 : 0,
+                },
+            };
+        });
+        const selected = bounded.items.map(item => item.element);
+        const selectedIds = new Set(selected.map(element => element.id));
+        const relationshipOmissions = selected.filter(element => element.type === 'block' && element.ocrSource?.scope === 'image'
+            && element.ocrSource.figureId && !selectedIds.has(element.ocrSource.figureId))
+            .map(element => ({ id: element.ocrSource.figureId, reason: 'associated_figure_omitted' }));
+        const nextCursor = bounded.nextPosition === null ? null : this.cursors.encode({
+            documentId: state.model.documentId,
+            extractionFingerprint: state.model.extractionFingerprint,
+            operation: 'pdf_get_pages',
+            argumentsValue: cursorArguments,
+            position: bounded.nextPosition,
+        });
+        const resourceUris = dedupe([
+            ...(completeDocument(state.model) ? [markdownResourceUri(state.model)] : []),
+            ...selected.filter(element => element.type === 'figure').map(element => element.asset.uri),
+        ]);
+        const data = outputFormat === 'markdown' ? {
+            outputFormat,
+            markdownFormatVersion: MARKDOWN_FORMAT_VERSION,
+            pages: requestedPages,
+            markdown: serializePagedMarkdown(selected, requestedPages, { tableDetail }),
+            resourceUris,
+        } : {
+            outputFormat,
             mode,
-            pages: [...requested].sort((a, b) => a - b),
-            elements: bounded.items,
-            citations: bounded.items.map(item => item.citation),
-            omissions: bounded.omissions,
-            budget: { configured: resolveBudget(args.budget), usage: bounded.usage, estimators: { text: 'utf8_bytes_divided_by_4' } },
-            nextCursor: bounded.nextOffset === null ? null : this.cursors.encode({ documentId: state.model.documentId, extractionFingerprint: state.model.extractionFingerprint, operation: 'pdf_get_pages', argumentsValue: cursorArguments, position: bounded.nextOffset }),
+            pages: requestedPages,
+            elements: selected,
+        };
+        return {
+            ...data,
+            citations: selected.map(item => item.citation),
+            warnings: summarizePageWarnings(state.model.pages.filter(page => requested.has(page.number))),
+            omissions: dedupe([...bounded.omissions, ...relationshipOmissions]),
+            budget: { configured: resolvedBudget, usage: bounded.usage, estimators: { text: 'utf8_bytes_divided_by_4', response: 'bounded_fragment_preflight_then_exact_wire_serialization' } },
+            nextCursor,
+            completion: {
+                documentComplete: completeDocument(state.model),
+                requestedScopeComplete: requestedPagesComplete(state.model, requestedPages),
+                resultComplete: nextCursor === null,
+            },
         };
         });
     }
@@ -371,7 +537,51 @@ export class DocumentManager {
             return await this.withOperation(args.documentId, args.extractionFingerprint, async state => {
                 const element = state.indexes.elements.get(args.elementId);
                 if (!element) throw new PdfDecompilerError('stale_reference', 'The element does not exist in the requested extraction generation.');
-                return element;
+                if (element.type !== 'table') {
+                    if (args.tableSelection) throw new PdfDecompilerError('TABLE_SELECTION_NOT_APPLICABLE', 'tableSelection is valid only for table elements.');
+                    if (args.cursor) throw new PdfDecompilerError('changed_cursor_arguments', 'This element does not use a continuation cursor.');
+                    return {
+                        element,
+                        tableSelection: null,
+                        citations: [element.citation],
+                        completion: { documentComplete: completeDocument(state.model), requestedScopeComplete: true, resultComplete: true },
+                    };
+                }
+                const resolvedBudget = resolveBudget(args.budget);
+                const cursorArguments = {
+                    elementId: args.elementId,
+                    tableSelection: args.tableSelection || null,
+                    requestedBudget: args.budget || null,
+                    hardBudgetFingerprint: fingerprint(HARD_BUDGET),
+                };
+                const cursorPosition = args.cursor ? this.cursors.decode(args.cursor, {
+                    documentId: state.model.documentId,
+                    extractionFingerprint: state.model.extractionFingerprint,
+                    operation: 'pdf_get_element',
+                    argumentsValue: cursorArguments,
+                }) : { offset: 0 };
+                const boundedBudget = {
+                    ...resolvedBudget,
+                    responseBytes: Math.floor(resolvedBudget.responseBytes * 0.65),
+                    estimatedTokens: Math.floor(resolvedBudget.estimatedTokens * 0.75),
+                };
+                const selected = selectTable(element, args.tableSelection || {}, boundedBudget, cursorPosition.offset || 0);
+                const nextCursor = selected.nextOffset === null ? null : this.cursors.encode({
+                    documentId: state.model.documentId,
+                    extractionFingerprint: state.model.extractionFingerprint,
+                    operation: 'pdf_get_element',
+                    argumentsValue: cursorArguments,
+                    position: { offset: selected.nextOffset },
+                });
+                return {
+                    element: selected.element,
+                    tableSelection: selected.tableSelection,
+                    citations: [element.citation],
+                    omissions: selected.omissions,
+                    budget: { ...selected.budget, configured: resolvedBudget },
+                    nextCursor,
+                    completion: { documentComplete: completeDocument(state.model), requestedScopeComplete: true, resultComplete: nextCursor === null },
+                };
             });
         } catch (error) {
             if (['cache_generation_missing', 'expired_process_state', 'stale_extraction_fingerprint'].includes(error.code)) {
@@ -424,15 +634,19 @@ export class DocumentManager {
             state.derivedAssets.set(id, asset);
             if (this.config.cache.mode === 'persistent') await this.cache.saveDerivedAsset(asset);
         }
-        return asset;
+        return { ...asset, completion: { documentComplete: completeDocument(state.model), requestedScopeComplete: true, resultComplete: true } };
         });
     }
 
     async readResource(uri) {
-        const match = /^pdf-decompiler:\/\/document\/(doc_[a-f0-9]{64})\/([a-f0-9]{64})\/(asset|canonical)\/(.+)$/.exec(uri);
-        if (!match) throw new PdfDecompilerError('invalid_resource_uri', 'The resource URI is invalid.');
-        const [, documentId, generation, kind, encodedId] = match;
-        const id = decodeURIComponent(encodedId);
+        const generationMatch = /^pdf-decompiler:\/\/document\/(doc_[a-f0-9]{64})\/([a-f0-9]{64})\/(asset|canonical)\/(.+)$/.exec(uri);
+        const markdownMatch = /^pdf-decompiler:\/\/document\/(doc_[a-f0-9]{64})\/([a-f0-9]{64})\/markdown\/(\d+)\/([a-f0-9]{64})\/full\.md$/.exec(uri);
+        if (!generationMatch && !markdownMatch) throw new PdfDecompilerError('invalid_resource_uri', 'The resource URI is invalid.');
+        const documentId = (generationMatch || markdownMatch)[1];
+        const generation = (generationMatch || markdownMatch)[2];
+        const kind = markdownMatch ? 'markdown' : generationMatch[3];
+        const id = generationMatch ? decodeURIComponent(generationMatch[4]) : markdownMatch[4];
+        if (markdownMatch && Number(markdownMatch[3]) !== MARKDOWN_FORMAT_VERSION) throw new PdfDecompilerError('stale_markdown_resource', 'The Markdown format version is unavailable.');
         let state = this.states.get(stateKey(documentId, generation));
         const activeState = state || null;
         let temporaryLease = null;
@@ -463,6 +677,11 @@ export class DocumentManager {
             state = { model: cached.model, pdfBytes: cached.pdfBytes, indexes: indexModel(cached.model), derivedAssets: new Map() };
         }
         try {
+            if (kind === 'markdown') {
+                if (!completeDocument(state.model)) throw new PdfDecompilerError('MARKDOWN_SERIALIZATION_FAILED', 'A complete Markdown export requires a complete canonical document. Use paged Markdown retrieval with cursors.');
+                const exported = await getFullMarkdownExport(state.model, this.cache, this.config, id);
+                return { mimeType: 'text/markdown', text: exported.text };
+            }
             if (kind === 'canonical') return { mimeType: 'application/json', text: JSON.stringify(modelView(state.model), null, 2) };
             let asset = state.derivedAssets.get(id) || state.indexes.assets.get(id);
             if ((!asset || !asset.data) && this.config.cache.mode === 'persistent') asset = await this.cache.loadDerivedAsset(documentId, generation, id) || asset;
@@ -515,7 +734,7 @@ export class DocumentManager {
         timingMark('handle_release');
         this.closedHandles.set(sourceId, Date.now());
         while (this.closedHandles.size > 1024) this.closedHandles.delete(this.closedHandles.keys().next().value);
-        if (state.handles.size > 0) return { closed: true, sourceId, remainingHandles: state.handles.size, cacheDeleted: false, deletionVerified: true };
+        if (state.handles.size > 0) return { closed: true, sourceId, remainingHandles: state.handles.size, cacheDeleted: false, deletionVerified: true, completion: { documentComplete: completeDocument(state.model), requestedScopeComplete: true, resultComplete: true } };
         state.closing = true;
         await this.waitForOperations(state);
         if (state.leaseId) await this.cache.releaseLease(state.leaseId);
@@ -527,7 +746,7 @@ export class DocumentManager {
         if (args.deleteCache) deletion = await this.cache.deleteGeneration(state.model.documentId, state.model.extractionFingerprint, { ignoreMissing: true, reason: 'deleted' });
         else await this.cache.cleanupDocumentState(state.model.documentId, state.model.extractionFingerprint);
         timingMark(args.deleteCache ? 'cache_deletion' : 'resource_cleanup');
-        return { closed: true, sourceId, remainingHandles: 0, cacheDeleted: deletion.deleted, deletionVerified: deletion.verified };
+        return { closed: true, sourceId, remainingHandles: 0, cacheDeleted: deletion.deleted, deletionVerified: deletion.verified, completion: { documentComplete: completeDocument(state.model), requestedScopeComplete: true, resultComplete: true } };
     }
 
     async close() {

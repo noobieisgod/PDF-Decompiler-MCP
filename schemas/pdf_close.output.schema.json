@@ -139,6 +139,37 @@
                   "properties": {
                     "code": {
                       "type": "string",
+                      "enum": [
+                        "MARKDOWN_EXPORT_TOO_LARGE",
+                        "MARKDOWN_SERIALIZATION_TIMEOUT",
+                        "MARKDOWN_SERIALIZATION_MEMORY_LIMIT",
+                        "MARKDOWN_CACHE_WRITE_FAILED",
+                        "MARKDOWN_CHECKSUM_FAILED",
+                        "MARKDOWN_SERIALIZATION_FAILED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
                       "minLength": 1
                     },
                     "message": {
@@ -380,6 +411,26 @@
           "type": "null"
         }
       ]
+    },
+    "completion": {
+      "type": "object",
+      "properties": {
+        "documentComplete": {
+          "type": "boolean"
+        },
+        "requestedScopeComplete": {
+          "type": "boolean"
+        },
+        "resultComplete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "documentComplete",
+        "requestedScopeComplete",
+        "resultComplete"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -393,7 +444,8 @@
     "diagnostics",
     "omissions",
     "budget",
-    "nextCursor"
+    "nextCursor",
+    "completion"
   ],
   "additionalProperties": false,
   "$id": "https://github.com/noobieisgod/PDF-Decompiler-MCP/schemas/pdf_close.output.schema.json"

@@ -109,7 +109,7 @@ export async function runExtractionSubprocess(pdfBytes, config, options = {}) {
     } finally {
         clearTimeout(timer);
         clearInterval(monitor);
-        await fs.rm(work, { recursive: true, force: true });
+        await fs.rm(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
 }
 
@@ -152,6 +152,6 @@ export async function runRenderSubprocess(pdfBytes, config, options) {
     } finally {
         clearTimeout(timer);
         clearInterval(monitor);
-        await fs.rm(work, { recursive: true, force: true });
+        await fs.rm(work, { recursive: true, force: true, maxRetries: 5, retryDelay: 50 });
     }
 }

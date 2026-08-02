@@ -81,44 +81,6 @@
               "additionalProperties": {
                 "type": "string"
               }
-            },
-            "budget": {
-              "type": "object",
-              "properties": {
-                "configured": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {
-                    "type": "number"
-                  }
-                },
-                "usage": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {
-                    "type": "number"
-                  }
-                },
-                "estimators": {
-                  "type": "object",
-                  "propertyNames": {
-                    "type": "string"
-                  },
-                  "additionalProperties": {
-                    "type": "string"
-                  }
-                }
-              },
-              "required": [
-                "configured",
-                "usage",
-                "estimators"
-              ],
-              "additionalProperties": false
             }
           },
           "required": [
@@ -131,8 +93,7 @@
             "height",
             "sha256",
             "uri",
-            "enforcement",
-            "budget"
+            "enforcement"
           ],
           "additionalProperties": false
         },
@@ -201,6 +162,37 @@
                     "retryable",
                     "requiresPassword",
                     "requiresConfigurationChange"
+                  ],
+                  "additionalProperties": false
+                },
+                {
+                  "type": "object",
+                  "properties": {
+                    "code": {
+                      "type": "string",
+                      "enum": [
+                        "MARKDOWN_EXPORT_TOO_LARGE",
+                        "MARKDOWN_SERIALIZATION_TIMEOUT",
+                        "MARKDOWN_SERIALIZATION_MEMORY_LIMIT",
+                        "MARKDOWN_CACHE_WRITE_FAILED",
+                        "MARKDOWN_CHECKSUM_FAILED",
+                        "MARKDOWN_SERIALIZATION_FAILED"
+                      ]
+                    },
+                    "message": {
+                      "type": "string"
+                    },
+                    "details": {
+                      "type": "object",
+                      "propertyNames": {
+                        "type": "string"
+                      },
+                      "additionalProperties": {}
+                    }
+                  },
+                  "required": [
+                    "code",
+                    "message"
                   ],
                   "additionalProperties": false
                 },
@@ -450,6 +442,26 @@
           "type": "null"
         }
       ]
+    },
+    "completion": {
+      "type": "object",
+      "properties": {
+        "documentComplete": {
+          "type": "boolean"
+        },
+        "requestedScopeComplete": {
+          "type": "boolean"
+        },
+        "resultComplete": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "documentComplete",
+        "requestedScopeComplete",
+        "resultComplete"
+      ],
+      "additionalProperties": false
     }
   },
   "required": [
@@ -463,7 +475,8 @@
     "diagnostics",
     "omissions",
     "budget",
-    "nextCursor"
+    "nextCursor",
+    "completion"
   ],
   "additionalProperties": false,
   "$id": "https://github.com/noobieisgod/PDF-Decompiler-MCP/schemas/pdf_render_page.output.schema.json"
