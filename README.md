@@ -1,15 +1,15 @@
 # PDF Decompiler MCP
 
+### Secure PDF evidence your AI agent can actually verify.
+
+PDF Decompiler MCP is a security-first, local-first PDF intelligence server for agents. It turns large PDFs into searchable text, structured tables, OCR, visual evidence, and page-level citations.
+
+Most PDF tools dump a document into model context. PDF Decompiler returns only the evidence your agent asks for, protects local files with explicit access roots, and escalates to selected images only when text is not enough.
+
+> **Privacy boundary:** Local-first describes this MCP server, not necessarily the entire AI stack. Your MCP client may send returned text, tables, images, names, financial details, or other document content to its configured language-model provider. For end-to-end local processing, use a client backed by a local model. Otherwise, review the client's and model provider's data controls before opening sensitive PDFs.
+
 [![Windows CI](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml)
 [![Best-effort compatibility](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml)
-
-**Security-first PDF access without flooding your AI's context**
-
-PDF Decompiler MCP lets an assistant search and read large PDFs as cited text, tables, and structured elements first, then inspect only the images or pages that actually need visual evidence. A 94-page annual report can be opened once and queried selectively instead of being pasted into the model in full.
-
-Parsing, OCR, indexing, and caching run on your machine. The server sends no telemetry, denies local-file access until you configure allowed folders, and uses bounded responses so the client receives only the requested evidence. It is designed for MCP clients including ChatGPT and Codex, Claude Desktop, and other compatible clients.
-
-Local-first describes this MCP server, not necessarily the entire AI stack. Your MCP client may send returned text, tables, images, names, financial details, or other document content to its configured language-model provider. For end-to-end local processing, use a client backed by a local model. Otherwise, review the client's and model provider's data controls before opening sensitive PDFs.
 
 ## What it does
 
