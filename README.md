@@ -2,7 +2,6 @@
 
 [![Windows CI](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml)
 [![Best-effort compatibility](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml)
-
 ### Secure PDF evidence your AI agent can actually verify.
 
 PDF Decompiler MCP is a security-first, local-first PDF intelligence server for agents. It turns large PDFs into searchable text, structured tables, OCR, visual evidence, and page-level citations.
