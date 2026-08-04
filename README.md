@@ -2,15 +2,15 @@
 
 PDF Decompiler MCP is a local-first Model Context Protocol server for bounded, cited PDF decomposition and selective retrieval. It converts an exact PDF byte stream into authoritative canonical JSON containing pages, semantic text blocks, tables and cells, figures, links, annotations, metadata, outlines, OCR relationships, and on-demand renders. Markdown is a deterministic projection of that model, not a separate extraction backend.
 
-Version 3.0.0 is implemented in this source tree but has not been published. Package publication, release creation, and the final npm name check require separate authorization.
-
 ## Requirements
 
-- Node.js 22 or 24. Windows tests both versions as the blocking CI matrix. macOS and Linux jobs are best-effort and do not support a compatibility claim until they pass.
+- Node.js 22 or 24.
+- Windows 10/11 (Older versions remain untested)
 - npm 10 or newer.
 - Optional Tesseract executable on `PATH` for OCR.
 - Optional `@huggingface/transformers@4.2.0` peer dependency for semantic retrieval.
 
+IMPORTANT: I do not have a Apple or Linux machine to validate macOS and Linux compatibility, so use at your own risk!
 Node.js 18 and 20 are not supported. The server uses the stable MCP TypeScript SDK v2 packages, pinned at 2.0.0, whose server package requires Node.js 20 or newer. This project deliberately tests and supports the active Node.js 22 and 24 release lines.
 
 ## Install from source
