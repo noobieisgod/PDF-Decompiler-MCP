@@ -11,6 +11,7 @@ PDF Decompiler MCP is a local-first Model Context Protocol server for bounded, c
 - Optional `@huggingface/transformers@4.2.0` peer dependency for semantic retrieval.
 
 IMPORTANT: I do not have a Apple or Linux machine to validate macOS and Linux compatibility, so use at your own risk!
+
 Node.js 18 and 20 are not supported. The server uses the stable MCP TypeScript SDK v2 packages, pinned at 2.0.0, whose server package requires Node.js 20 or newer. This project deliberately tests and supports the active Node.js 22 and 24 release lines.
 
 ## Install from source
