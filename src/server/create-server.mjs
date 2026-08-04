@@ -214,7 +214,7 @@ export function createServer(manager) {
 
     server.registerTool('pdf_get_pages', {
         title: 'Get PDF page elements',
-        description: 'Return deterministic cited elements for selected pages under explicit response budgets and signed cursors.',
+        description: 'Return deterministic cited elements for selected pages under explicit response budgets and signed cursors. Start textual questions with mode text, which excludes figures. The default balanced mode adds captioned figure references without inline image bytes. Escalate only relevant pages to fidelity or pdf_render_page when visual evidence is needed.',
         inputSchema: GetPagesSchema,
         outputSchema: OutputSchemas.pdf_get_pages,
         annotations: READ_ONLY,
@@ -230,7 +230,7 @@ export function createServer(manager) {
 
     server.registerTool('pdf_render_page', {
         title: 'Render PDF page',
-        description: 'Render a bounded page or crop. Auto uses a resource because MCP does not negotiate a generic inline-image capability. Inline data is returned only when explicitly requested.',
+        description: 'Render a bounded page or crop only when text retrieval identifies a need for visual evidence. Auto uses a resource because MCP does not negotiate a generic inline-image capability. Inline data is returned only when explicitly requested.',
         inputSchema: RenderPageSchema,
         outputSchema: OutputSchemas.pdf_render_page,
         annotations: READ_ONLY,

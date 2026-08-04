@@ -24,6 +24,9 @@ test('official SDK v2 negotiates the immutable resource and structured-content s
     const client = new Client({ name: 'protocol-test', version: '1.0.0' });
     await client.connect(clientTransport);
     t.after(async () => { await client.close(); await server.close(); });
+    const tools = (await client.listTools()).tools;
+    assert.match(tools.find(tool => tool.name === 'pdf_get_pages').description, /Start textual questions with mode text/);
+    assert.match(tools.find(tool => tool.name === 'pdf_render_page').description, /only when text retrieval identifies a need/);
     assert.equal((await client.listResourceTemplates()).resourceTemplates.length, 2);
     const result = await client.callTool({ name: 'pdf_document_info', arguments: { documentId: doc, extractionFingerprint: generation } });
     assert.equal(result.structuredContent.schemaVersion, '3.0.0');
