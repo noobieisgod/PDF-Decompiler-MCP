@@ -1,6 +1,17 @@
 # PDF Decompiler MCP
 
+[![CI](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml)
+
 PDF Decompiler MCP is a local-first Model Context Protocol server for bounded, cited PDF decomposition and selective retrieval. It converts an exact PDF byte stream into authoritative canonical JSON containing pages, semantic text blocks, tables and cells, figures, links, annotations, metadata, outlines, OCR relationships, and on-demand renders. Markdown is a deterministic projection of that model, not a separate extraction backend.
+
+## What it does
+
+- Gives MCP-compatible assistants cited text, tables, figures, links, annotations, and page renders from PDFs.
+- Starts with searchable structured text to limit token use, then lets the assistant request images only when visual inspection is useful.
+- Processes documents locally, sends no telemetry, and restricts local files to explicitly allowed folders by default.
+- Handles large documents through bounded retrieval, search, and resumable cursors instead of returning the entire PDF at once.
+
+For most users, setup is three steps: install the server, connect one desktop app, and select the folders it may access. The detailed extraction, cache, security, and retrieval contracts remain documented below.
 
 ## Requirements
 
@@ -23,8 +34,41 @@ winget install --id OpenJS.NodeJS.LTS --exact --source winget --accept-package-a
 winget install --id UB-Mannheim.TesseractOCR --exact --source winget --accept-package-agreements --accept-source-agreements
 $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
 npm.cmd install --global "https://github.com/noobieisgod/PDF-Decompiler-MCP/releases/download/Release_V3.0/pdf-decompiler-mcp-3.0.0.tgz"
-pdf-decompiler-mcp --allow-root "C:\path\to\pdfs"
+(Get-Command pdf-decompiler-mcp.cmd).Source
 ```
+
+The final command prints the installed executable path. Use that absolute path if a desktop app cannot find `pdf-decompiler-mcp.cmd` by name.
+
+## Connect a Windows desktop app
+
+### ChatGPT Windows desktop app
+
+The ChatGPT desktop app and Codex share the same MCP configuration.
+
+1. Complete the Quick Windows install above.
+2. Open **Settings**, select **MCP servers**, then select **Add server**.
+3. Enter `pdf-decompiler-mcp`, choose **STDIO**, and use `pdf-decompiler-mcp.cmd` as the command.
+4. Add `--allow-root` and the absolute folder containing your PDFs as arguments, for example `C:\Documents\PDFs`.
+5. Save the server, select **Restart**, then type `/mcp` in a new chat to confirm that all seven tools are available.
+
+You can configure the same server from Codex CLI instead:
+
+```powershell
+codex mcp add pdf-decompiler-mcp -- pdf-decompiler-mcp.cmd --allow-root "C:\Documents\PDFs"
+```
+
+See the official [ChatGPT and Codex MCP guide](https://learn.chatgpt.com/docs/extend/mcp). ChatGPT web cannot launch this local STDIO server directly.
+
+### Claude Windows desktop app
+
+Claude Desktop can install the prebuilt MCPB extension without the global npm installation.
+
+1. Download [`pdf-decompiler-mcp-3.0.0.mcpb`](https://github.com/noobieisgod/PDF-Decompiler-MCP/releases/download/Release_V3.0/pdf-decompiler-mcp-3.0.0.mcpb).
+2. Open **Settings**, select **Extensions**, then open **Advanced settings**.
+3. Select **Install Extension**, choose the downloaded MCPB file, and select the folders Claude may access when prompted.
+4. Start a new conversation. If the tools do not appear, fully quit and reopen Claude Desktop, then check the **Connectors** menu beside the chat input.
+
+Claude Desktop supplies the Node.js runtime for MCPB extensions. Tesseract remains optional and is needed only for OCR. See Claude's official [local MCP server guide](https://support.claude.com/en/articles/10949351-getting-started-with-local-mcp-servers-on-claude-desktop).
 
 ## Install from source
 
