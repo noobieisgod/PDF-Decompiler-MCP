@@ -4,6 +4,7 @@
 [![Best-effort compatibility](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml)
 
 **Security-first PDF access without flooding your AI's context**
+
 PDF Decompiler MCP lets an assistant search and read large PDFs as cited text, tables, and structured elements first, then inspect only the images or pages that actually need visual evidence. A 94-page annual report can be opened once and queried selectively instead of being pasted into the model in full.
 
 Parsing, OCR, indexing, and caching run on your machine. The server sends no telemetry, denies local-file access until you configure allowed folders, and uses bounded responses so the client receives only the requested evidence. It is designed for MCP clients including ChatGPT and Codex, Claude Desktop, and other compatible clients.
