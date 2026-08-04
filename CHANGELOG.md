@@ -1,5 +1,12 @@
 # Changelog
 
+## Unreleased
+
+- Added a `doctor` command and server-level text-first workflow instructions.
+- Added two licensed real-world evaluation PDFs plus an external, checksum-recorded TSMC annual-report sample.
+- Separated blocking Windows CI from visible best-effort macOS, Linux, and Linux OCR status.
+- Simplified the README opening and added copyable desktop-client configuration.
+
 ## 3.0.0
 
 - Renamed Lightweight PDF MCP for Claude AI to PDF Decompiler MCP.

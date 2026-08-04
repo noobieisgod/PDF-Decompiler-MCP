@@ -1,0 +1,44 @@
+{
+  "schemaVersion": 1,
+  "samples": [
+    {
+      "id": "medium-test-one",
+      "title": "Medium Test One",
+      "file": "pdfs/Medium Test One.pdf",
+      "distribution": "included",
+      "sha256": "b327541ec5bf7130e0b9881798af0816a1d5f5d183ed50a42fdd2c71d0cf8624",
+      "bytes": 650335,
+      "pages": 16,
+      "license": "CC-BY-SA-4.0 with separately attributed components",
+      "provenance": "ATTRIBUTION.md#medium-test-one",
+      "features": ["long-form biography", "Wikimedia photographs", "tables", "external links", "mixed native and raster text", "OCR"]
+    },
+    {
+      "id": "medium-test-two",
+      "title": "Medium Test Two",
+      "file": "pdfs/Medium Test Two.pdf",
+      "distribution": "included",
+      "sha256": "7912dd4a2f687f1b744ec06a98beb8b373c6ac60958db54602ae34d5a7e537b7",
+      "bytes": 3831598,
+      "pages": 30,
+      "license": "CC-BY-4.0",
+      "provenance": "ATTRIBUTION.md#medium-test-two",
+      "features": ["technical guide", "screenshots", "code", "links", "bordered tables", "image-heavy cover", "multi-column layouts"]
+    },
+    {
+      "id": "heavy-test-one",
+      "title": "TSMC 2024 Annual Report",
+      "file": "pdfs/Heavy Test One.pdf",
+      "distribution": "download-only",
+      "sha256": "a2c3ce8edd7e5d6e01074c477cee4d88d2b874d46c033a457c64b3023bfa6d9e",
+      "bytes": 11391367,
+      "pages": 94,
+      "license": "Copyright TSMC; no redistribution permission granted",
+      "sourceUrl": "https://investor.tsmc.com/static/annualReports/2024/english/index.html",
+      "termsUrl": "https://www.tsmc.com/english/legal_and_trademark",
+      "artifactNote": "The recorded hash identifies the copy validated in August 2026. TSMC may replace the official download while retaining the report title.",
+      "provenance": "ATTRIBUTION.md#heavy-test-one",
+      "features": ["annual report", "dense tables", "multi-column layouts", "raster and vector graphics", "internal links", "94-page full-document processing"]
+    }
+  ]
+}

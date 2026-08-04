@@ -186,6 +186,8 @@ export function createServer(manager) {
         name: 'pdf-decompiler-mcp',
         title: 'PDF Decompiler MCP',
         version: pkg.version,
+    }, {
+        instructions: 'Open the PDF, then start textual work with pdf_search or pdf_get_pages using mode text. Text mode excludes figures and minimizes context use. Escalate only relevant pages to balanced, fidelity, or pdf_render_page when text, omissions, or document information indicates that visual evidence is needed. Close every sourceId when finished.',
     });
 
     server.registerTool('pdf_open', {

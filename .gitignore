@@ -6,5 +6,9 @@ artifacts/
 test/fixtures/generated/Heavy Test One.pdf
 test/fixtures/generated/Medium Test One.pdf
 test/fixtures/generated/Medium Test Two.pdf
+!evaluation/pdfs/Medium Test One.pdf
+!evaluation/pdfs/Medium Test Two.pdf
+evaluation/pdfs/Heavy Test One.pdf
+evaluation/pdfs/*.tmp-*
 .DS_Store
 Thumbs.db

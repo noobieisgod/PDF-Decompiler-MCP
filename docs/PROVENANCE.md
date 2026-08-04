@@ -11,7 +11,11 @@
 
 ## Material reviewed
 
-The migration inventory identifies original repository archives, PDFs, and source trees. The 3.0.0 implementation reuses the repository owner's extraction source and adapts official package APIs. No third-party document text is copied into generated fixtures. The three ignored local reports are validation inputs only and are excluded from Git and package allowlists. Package inspection excludes tests, release archives, and development-only tooling.
+The migration inventory identifies original repository archives, PDFs, and source trees. The 3.0.0 implementation reuses the repository owner's extraction source and adapts official package APIs. No third-party document text is copied into generated synthetic fixtures.
+
+The separate real-world evaluation corpus contains two checked-in PDFs with document-specific licenses and attribution. Medium Test One combines CC BY-SA Wikipedia text, Wikimedia images under the licenses or public-domain claims listed in `evaluation/ATTRIBUTION.md`, project-owned VEXLearn material, and public-domain Declaration of Independence text. Medium Test Two is original VEXLearn material licensed by Eric Lee under CC BY 4.0, excluding third-party marks and depicted interfaces. TSMC's annual report remains download-only because TSMC's terms do not grant republication permission. Evaluation content is excluded from npm and MCPB package allowlists.
+
+Package inspection excludes evaluation PDFs, tests, release archives, and development-only tooling.
 
 ## Release-blocking attestations
 

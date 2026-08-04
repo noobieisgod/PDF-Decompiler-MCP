@@ -17,6 +17,7 @@ test('stdio stays protocol-clean, accepts a 2025-era opening, and shuts down', a
     const deadline = Date.now() + 10_000;
     while (!stdout.includes('"id":1') && Date.now() < deadline) await new Promise(resolve => setTimeout(resolve, 25));
     assert.match(stdout, /"protocolVersion":"2025-06-18"/);
+    assert.match(stdout, /start textual work with pdf_search or pdf_get_pages using mode text/);
     assert.doesNotMatch(stdout, /pdf-decompiler-mcp\]/);
     child.stdin.end();
     const exitCode = await new Promise(resolve => child.once('exit', resolve));

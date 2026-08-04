@@ -1,4 +1,4 @@
-name: Windows CI
+name: Best-effort compatibility
 
 on:
   push:
@@ -8,12 +8,13 @@ permissions:
   contents: read
 
 jobs:
-  windows-blocking:
+  platforms:
     strategy:
       fail-fast: false
       matrix:
+        os: [macos-latest, ubuntu-latest]
         node: [22, 24]
-    runs-on: windows-latest
+    runs-on: ${{ matrix.os }}
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -22,18 +23,24 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npm run fixtures:generate
-      - run: npm run fixtures:verify
-      - run: npm run schemas:generate
       - run: npm test
       - run: npm run doctor -- --cache-mode none --allow-root .
       - run: npm run evaluation:verify
       - run: npm run test:local-pdfs
-      - run: npm audit --audit-level=high
       - run: npm run check
-      - run: npm run docs:check
-      - run: npm run license:check
-      - run: npm run benchmark
-      - run: npm run sbom
-      - run: npm run package:verify -- "${{ runner.temp }}/pdf-decompiler-packages"
-      - run: npm run release:verify
-      - run: git diff --exit-code
+
+  linux-ocr:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+      - run: sudo apt-get update
+      - run: sudo apt-get install -y tesseract-ocr
+      - run: npm ci
+      - run: npm run fixtures:generate
+      - run: npm run test:ocr
+        env:
+          PDF_DECOMPILER_TEST_OCR: "1"

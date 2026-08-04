@@ -19,4 +19,10 @@ function filesNative(location) {
 }
 
 assert.equal(JSON.parse(await fs.readFile('test/fixtures/generated/LICENSE.json', 'utf8')).license, 'CC0-1.0');
+const evaluation = JSON.parse(await fs.readFile('evaluation/manifest.json', 'utf8'));
+assert.deepEqual(evaluation.samples.map(sample => [sample.id, sample.distribution, sample.license]), [
+    ['medium-test-one', 'included', 'CC-BY-SA-4.0 with separately attributed components'],
+    ['medium-test-two', 'included', 'CC-BY-4.0'],
+    ['heavy-test-one', 'download-only', 'Copyright TSMC; no redistribution permission granted'],
+]);
 console.log(JSON.stringify({ checked: packages.length, packages }, null, 2));

@@ -14,7 +14,7 @@ Launching a process is not sufficient for a compatibility claim. Validation cove
 
 Before stable publication, record exact Claude Desktop and Codex client versions and dates, then exercise every behavior in the opening paragraph. A failed behavior must be marked partial with its limitation, not compatible.
 
-Windows is the blocking validation platform for this corrective effort. macOS and Linux CI definitions are retained as best-effort jobs, but no current compatibility claim is made because those jobs were not executed in this workspace. Their filesystem, native-memory, locking, packaging, OCR, and stdio behavior remains unverified until a dated job succeeds.
+Windows is the blocking validation platform for this corrective effort. macOS, Linux, and Linux OCR run in a separate best-effort workflow whose badge reports failures independently from Windows CI. No current compatibility claim is made for those platforms until a dated successful matrix is recorded here. Their filesystem, native-memory, locking, packaging, OCR, and stdio behavior remains unverified.
 
 Image behavior is request driven, not inferred from a nonexistent generic client capability. `auto` returns a resource link and text URI. A client profile may explicitly request inline content after that client has been tested.
 

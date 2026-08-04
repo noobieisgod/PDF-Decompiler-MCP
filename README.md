@@ -1,17 +1,23 @@
 # PDF Decompiler MCP
 
-[![CI](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml)
+[![Windows CI](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml)
+[![Best-effort compatibility](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml)
 
-PDF Decompiler MCP is a local-first Model Context Protocol server for bounded, cited PDF decomposition and selective retrieval. It converts an exact PDF byte stream into authoritative canonical JSON containing pages, semantic text blocks, tables and cells, figures, links, annotations, metadata, outlines, OCR relationships, and on-demand renders. Markdown is a deterministic projection of that model, not a separate extraction backend.
+## Give your AI agent eyes for PDFs without flooding its context
+
+PDF Decompiler MCP lets an assistant search and read large PDFs as cited text, tables, and structured elements first, then inspect only the images or pages that actually need visual evidence. A 94-page annual report can be opened once and queried selectively instead of being pasted into the model in full.
+
+It runs locally, sends no telemetry, and gives you explicit control over which folders the assistant may read. It is designed for MCP clients including ChatGPT and Codex, Claude Desktop, and other compatible clients.
 
 ## What it does
 
-- Gives MCP-compatible assistants cited text, tables, figures, links, annotations, and page renders from PDFs.
-- Starts with searchable structured text to limit token use, then lets the assistant request images only when visual inspection is useful.
-- Processes documents locally, sends no telemetry, and restricts local files to explicitly allowed folders by default.
-- Handles large documents through bounded retrieval, search, and resumable cursors instead of returning the entire PDF at once.
+- Search a PDF without loading every page into model context.
+- Retrieve cited paragraphs, headings, tables, links, annotations, and Markdown.
+- Start in low-token text mode, then request figures or page renders only when needed.
+- Process scans with optional local Tesseract OCR.
+- Handle large documents with hard budgets and resumable cursors.
 
-For most users, setup is three steps: install the server, connect one desktop app, and select the folders it may access. The detailed extraction, cache, security, and retrieval contracts remain documented below.
+For most users, setup is three steps: install the server, run `doctor`, and connect one desktop app. The technical model, cache, security, and retrieval contracts remain documented below for users who need them.
 
 ## Requirements
 
@@ -21,7 +27,7 @@ For most users, setup is three steps: install the server, connect one desktop ap
 - Optional Tesseract executable on `PATH` for OCR.
 - Optional `@huggingface/transformers@4.2.0` peer dependency for semantic retrieval.
 
-I do not have a Apple or Linux machine to validate macOS and Linux compatibility, so use at your own risk! Node.js 18 and 20 are not supported. The server uses the stable MCP TypeScript SDK v2 packages, pinned at 2.0.0, whose server package requires Node.js 20 or newer. This project deliberately tests and supports the active Node.js 22 and 24 release lines.
+I do not have an Apple or Linux machine for direct local validation. GitHub Actions runs those platforms in a separate nonblocking workflow whose failures remain visible instead of being hidden by the Windows release result. Node.js 18 and 20 are not supported. The server uses the stable MCP TypeScript SDK v2 packages, pinned at 2.0.0, whose server package requires Node.js 20 or newer. This project deliberately tests and supports the active Node.js 22 and 24 release lines.
 
 ## Quick Windows install
 
@@ -35,9 +41,10 @@ winget install --id UB-Mannheim.TesseractOCR --exact --source winget --accept-pa
 $env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
 npm.cmd install --global "https://github.com/noobieisgod/PDF-Decompiler-MCP/releases/download/Release_V3.0/pdf-decompiler-mcp-3.0.0.tgz"
 (Get-Command pdf-decompiler-mcp.cmd).Source
+pdf-decompiler-mcp.cmd doctor --cache-mode none --allow-root "C:\Documents\PDFs"
 ```
 
-The final command prints the installed executable path. Use that absolute path if a desktop app cannot find `pdf-decompiler-mcp.cmd` by name.
+The path command prints the installed executable location. The doctor command verifies Node.js, the selected folder, server startup, cache initialization, and optional Tesseract availability without starting the MCP stdio loop. Replace `C:\Documents\PDFs` with your folder. Use the printed executable path if a desktop app cannot find `pdf-decompiler-mcp.cmd` by name.
 
 ## Connect a Windows desktop app
 
@@ -55,6 +62,14 @@ You can configure the same server from Codex CLI instead:
 
 ```powershell
 codex mcp add pdf-decompiler-mcp -- pdf-decompiler-mcp.cmd --allow-root "C:\Documents\PDFs"
+```
+
+That command writes the shared ChatGPT, Codex CLI, and Codex IDE MCP configuration automatically. The equivalent manual `config.toml` entry is:
+
+```toml
+[mcp_servers.pdf_decompiler]
+command = "pdf-decompiler-mcp.cmd"
+args = ["--allow-root", "C:\\Documents\\PDFs"]
 ```
 
 See the official [ChatGPT and Codex MCP guide](https://learn.chatgpt.com/docs/extend/mcp). ChatGPT web cannot launch this local STDIO server directly.
@@ -225,7 +240,9 @@ npm run benchmark
 npm run package:verify -- artifacts\package-verification
 ```
 
-Forty-four deterministic fixtures are generated from source with hashes, intended features, expected classifications, geometry requirements, warnings, errors, and licensing metadata. They contain no third-party document content. The ignored `Heavy Test One.pdf`, `Medium Test One.pdf`, and `Medium Test Two.pdf` files are optional local integration samples and are excluded from Git and package allowlists.
+Forty-four deterministic fixtures are generated from source with hashes, intended features, expected classifications, geometry requirements, warnings, errors, and licensing metadata. They contain no third-party document content.
+
+The [`evaluation/`](evaluation/) corpus adds two licensed real-world PDFs covering biography, photographs, OCR, technical documentation, screenshots, code, links, and tables. TSMC's 94-page 2024 Annual Report is referenced as a download-only third sample because its site terms do not grant republication rights. Download it from the official page and save it as `evaluation/pdfs/Heavy Test One.pdf`, then run `npm run test:local-pdfs`. All evaluation PDFs remain excluded from npm and MCPB packages.
 
 CI requires Node.js 22 and 24 on Windows for extraction, geometry, security, cache, packaging, MCP, and available OCR validation. macOS, Linux, and remote Linux OCR jobs remain configured as best-effort coverage. Unexecuted platform-specific behavior is reported as unverified. Tests run only where the host supports drive casing, UNC paths, symlinks, junctions, ACLs, permission denial, process monitoring, and atomic filesystem semantics.
 
@@ -235,7 +252,7 @@ Benchmark output reports one observed cold open, warm open, and search measureme
 
 ## Packaging and release status
 
-The repository can build and inspect an npm tarball and MCPB bundle, generate SHA-256 checksums, and produce an SPDX SBOM without publishing. `package.json` remains private so publication cannot occur accidentally. Package-name availability and ownership must be checked immediately before an authorized release. A name conflict must be reported and must not trigger an automatic rename or publication under another name.
+The repository can build and inspect an npm tarball and MCPB bundle, generate SHA-256 checksums, and produce an SPDX SBOM without publishing. The current supported installation uses the verified GitHub Release tarball or MCPB extension. `package.json` remains private, so `npx pdf-decompiler-mcp` is not advertised until npm publication is separately authorized and completed. Package-name availability and ownership must be checked immediately before that action. A name conflict must be reported and must not trigger an automatic rename or publication under another name.
 
 Relicensing and publication remain gated by the ownership, provenance, dependency, native binary, MuPDF, PDF.js, OCR, fixture, bundled asset, model, tokenizer, notice, source-distribution, npm-content, MCPB-content, and SBOM review in [`docs/PROVENANCE.md`](docs/PROVENANCE.md). See [`docs/RELEASE.md`](docs/RELEASE.md) for the complete release gate.
 
@@ -247,6 +264,7 @@ Relicensing and publication remain gated by the ownership, provenance, dependenc
 - [`docs/PRIVACY.md`](docs/PRIVACY.md)
 - [`docs/CLIENT-COMPATIBILITY.md`](docs/CLIENT-COMPATIBILITY.md)
 - [`docs/BENCHMARKING.md`](docs/BENCHMARKING.md)
+- [`evaluation/README.md`](evaluation/README.md)
 - [`SECURITY.md`](SECURITY.md)
 - [`MIGRATION.md`](MIGRATION.md)
 - [`CHANGELOG.md`](CHANGELOG.md)

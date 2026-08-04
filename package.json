@@ -62,6 +62,8 @@
         "fixtures:generate": "node test/fixtures/generate-fixtures.mjs",
         "fixtures:verify": "node scripts/verify-fixtures.mjs",
         "test:local-pdfs": "node scripts/test-local-pdfs.mjs",
+        "doctor": "node src/index.mjs doctor",
+        "evaluation:verify": "node --test test/evaluation.test.mjs",
         "audit": "npm audit --audit-level=high"
     },
     "dependencies": {

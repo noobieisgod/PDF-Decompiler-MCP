@@ -1,11 +1,23 @@
 import fs from 'node:fs/promises';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { createHash } from 'node:crypto';
 import { loadConfig } from '../src/config/runtime.mjs';
 import { DocumentManager } from '../src/runtime/document-manager.mjs';
 import { detectTesseract } from '../src/extract/ocr.mjs';
 import { Client, InMemoryTransport } from '@modelcontextprotocol/client';
 import { createServer } from '../src/server/create-server.mjs';
+
+function validateMediumOneOcr(state) {
+    const page = state.model.pages.find(item => item.number === 16);
+    const ocrText = state.model.elements.filter(element => element.type === 'block' && element.textSource === 'ocr').map(element => element.text).join(' ');
+    if (page.ocr.status === 'accepted' || page.ocr.status === 'partial') {
+        if (!/human event|truths|unalienable|liberty|congress/i.test(ocrText)) throw new Error('Accepted Medium Test One page 16 OCR was not recognizable');
+    } else if (ocrText) {
+        throw new Error('Rejected Medium Test One page 16 OCR entered canonical text');
+    }
+    return page.ocr.status;
+}
 
 async function correctiveLocalPdfs(root, available) {
     const manager = await new DocumentManager(loadConfig({ cacheMode: 'none', allowRoots: [root], ocrPolicy: 'off', extractionTimeoutMs: 180_000 })).init();
@@ -21,10 +33,7 @@ async function correctiveLocalPdfs(root, available) {
             handles.push(opened, await manager.open({ source: path.join(root, 'Medium Test One.pdf'), pages: [{ start: 16, end: 16 }], ocrPolicy: 'required' }));
             const state = await manager.requireState(opened.documentId, opened.extractionFingerprint);
             const page = state.model.pages.find(item => item.number === 16);
-            const ocrText = state.model.elements.filter(element => element.type === 'block' && element.textSource === 'ocr').map(element => element.text).join(' ');
-            if (page.ocr.status === 'accepted' || page.ocr.status === 'partial') {
-                if (!/human event|truths|unalienable|liberty|congress/i.test(ocrText)) throw new Error('Accepted Medium Test One page 16 OCR was not recognizable');
-            } else if (ocrText) throw new Error('Rejected Medium Test One page 16 OCR entered canonical text');
+            validateMediumOneOcr(state);
             console.log(`corrective OCR: status=${page.ocr.status}; accepted=${page.ocr.acceptedRegions}; rejected=${page.ocr.rejectedRegions}`);
         }
         if (available.includes('Medium Test Two.pdf')) {
@@ -81,7 +90,7 @@ async function correctiveLocalPdfs(root, available) {
 }
 
 export async function testLocalPdfs() {
-    const root = path.resolve(process.env.PDF_DECOMPILER_LOCAL_PDF_DIR || 'test/fixtures/generated');
+    const root = path.resolve(process.env.PDF_DECOMPILER_LOCAL_PDF_DIR || 'evaluation/pdfs');
     const names = ['Heavy Test One.pdf', 'Medium Test One.pdf', 'Medium Test Two.pdf'];
     const available = [];
     for (const name of names) if (await fs.access(path.join(root, name)).then(() => true, () => false)) available.push(name);
@@ -94,7 +103,9 @@ export async function testLocalPdfs() {
     try {
         for (const name of available) {
             const startedAt = Date.now();
-            const opened = await manager.open({ source: path.join(root, name) });
+            const source = path.join(root, name);
+            const sha256 = createHash('sha256').update(await fs.readFile(source)).digest('hex');
+            const opened = await manager.open({ source });
             const state = await manager.requireState(opened.documentId, opened.extractionFingerprint);
             if (!opened.completion.documentComplete || state.model.pages.length !== state.model.totalPages) throw new Error(`${name} did not complete every page`);
             for (const element of state.model.elements) {
@@ -114,15 +125,14 @@ export async function testLocalPdfs() {
             }
             if (JSON.stringify(state.model).includes(root)) throw new Error(`${name} leaked its local directory`);
             await manager.closeDocument(opened);
-            console.log(`validated local sample: ${name}; pages=${state.model.totalPages}; ms=${Date.now() - startedAt}`);
+            console.log(`validated local sample: ${name}; sha256=${sha256}; pages=${state.model.totalPages}; ms=${Date.now() - startedAt}`);
         }
         if (available.includes('Medium Test One.pdf') && detectTesseract()) {
             const opened = await manager.open({ source: path.join(root, 'Medium Test One.pdf'), pages: [{ start: 16, end: 16 }], ocrPolicy: 'required' });
             const state = await manager.requireState(opened.documentId, opened.extractionFingerprint);
-            const ocrText = state.model.elements.filter(element => element.type === 'block' && element.textSource === 'ocr').map(element => element.text).join(' ');
-            if (!/human event|truths|unalienable|liberty/i.test(ocrText)) throw new Error('Medium Test One page 16 image OCR did not recover Declaration text');
+            const status = validateMediumOneOcr(state);
             await manager.closeDocument(opened);
-            console.log('validated local image OCR: Medium Test One.pdf page 16');
+            console.log(`validated local image OCR outcome: Medium Test One.pdf page 16; status=${status}`);
         }
     } finally {
         await manager.close();
