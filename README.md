@@ -14,6 +14,18 @@ IMPORTANT: I do not have a Apple or Linux machine to validate macOS and Linux co
 
 Node.js 18 and 20 are not supported. The server uses the stable MCP TypeScript SDK v2 packages, pinned at 2.0.0, whose server package requires Node.js 20 or newer. This project deliberately tests and supports the active Node.js 22 and 24 release lines.
 
+## Quick Windows install
+
+Paste this complete block into PowerShell. It installs Node.js 24 LTS, Tesseract OCR, and PDF Decompiler MCP 3.0.0 from the verified GitHub Release package. Replace the final path with the folder containing the PDFs you want the server to access.
+
+```powershell
+winget install --id OpenJS.NodeJS.LTS --exact --source winget --accept-package-agreements --accept-source-agreements
+winget install --id UB-Mannheim.TesseractOCR --exact --source winget --accept-package-agreements --accept-source-agreements
+$env:Path = [Environment]::GetEnvironmentVariable("Path", "Machine") + ";" + [Environment]::GetEnvironmentVariable("Path", "User")
+npm.cmd install --global "https://github.com/noobieisgod/PDF-Decompiler-MCP/releases/download/Release_V3.0/pdf-decompiler-mcp-3.0.0.tgz"
+pdf-decompiler-mcp --allow-root "C:\path\to\pdfs"
+```
+
 ## Install from source
 
 ```powershell
