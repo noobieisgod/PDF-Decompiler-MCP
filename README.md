@@ -10,14 +10,11 @@ PDF Decompiler MCP is a local-first Model Context Protocol server for bounded, c
 - Optional Tesseract executable on `PATH` for OCR.
 - Optional `@huggingface/transformers@4.2.0` peer dependency for semantic retrieval.
 
-IMPORTANT: I do not have a Apple or Linux machine to validate macOS and Linux compatibility, so use at your own risk!
-
-Node.js 18 and 20 are not supported. The server uses the stable MCP TypeScript SDK v2 packages, pinned at 2.0.0, whose server package requires Node.js 20 or newer. This project deliberately tests and supports the active Node.js 22 and 24 release lines.
-
-> [!WARNING]
-> PDF Decompiler MCP can access only files inside directories configured with `--allow-root` by default. Add every directory the client needs, or requests outside those roots will be denied. The `--unrestricted-local-access` flag or `PDF_DECOMPILER_UNRESTRICTED_LOCAL_ACCESS=true` grants broad local-file access and should be enabled only intentionally. Configured deny roots still take precedence.
+I do not have a Apple or Linux machine to validate macOS and Linux compatibility, so use at your own risk! Node.js 18 and 20 are not supported. The server uses the stable MCP TypeScript SDK v2 packages, pinned at 2.0.0, whose server package requires Node.js 20 or newer. This project deliberately tests and supports the active Node.js 22 and 24 release lines.
 
 ## Quick Windows install
+
+IMPORTANT: PDF Decompiler MCP can access only files inside directories configured with `--allow-root` by default. Add every directory the client needs, or requests outside those roots will be denied. The `--unrestricted-local-access` flag or `PDF_DECOMPILER_UNRESTRICTED_LOCAL_ACCESS=true` grants broad local-file access and should be enabled only intentionally. Configured deny roots still take precedence.
 
 Paste this complete block into PowerShell. It installs Node.js 24 LTS, Tesseract OCR, and PDF Decompiler MCP 3.0.0 from the verified GitHub Release package. Replace the final path with the folder containing the PDFs you want the server to access.
 
