@@ -50,15 +50,15 @@ The path command prints the installed executable location. The doctor command ve
 
 ## Connect a Windows desktop app
 
-### ChatGPT Windows desktop app
+### Codex mode in the ChatGPT desktop app
 
-The ChatGPT desktop app and Codex share the same MCP configuration.
+Use Codex mode for this local STDIO server. Ordinary Chat mode does not expose local STDIO MCP tools. Codex mode in the ChatGPT desktop app, Codex CLI, and the Codex IDE extension share the same MCP configuration.
 
 1. Complete the Quick Windows install above.
 2. Open **Settings**, select **MCP servers**, then select **Add server**.
 3. Enter `pdf-decompiler-mcp`, choose **STDIO**, and use `pdf-decompiler-mcp.cmd` as the command.
 4. Add `--allow-root` and the absolute folder containing your PDFs as arguments, for example `C:\Documents\PDFs`.
-5. Save the server, select **Restart**, then type `/mcp` in a new chat to confirm that all seven tools are available.
+5. Save the server, select **Restart**, switch to **Codex**, then type `/mcp` in a new task to confirm that all seven tools are available.
 
 You can configure the same server from Codex CLI instead:
 
