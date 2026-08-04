@@ -1,5 +1,8 @@
 # PDF Decompiler MCP
 
+[![Windows CI](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml)
+[![Best-effort compatibility](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml)
+
 ### Secure PDF evidence your AI agent can actually verify.
 
 PDF Decompiler MCP is a security-first, local-first PDF intelligence server for agents. It turns large PDFs into searchable text, structured tables, OCR, visual evidence, and page-level citations.
@@ -7,9 +10,6 @@ PDF Decompiler MCP is a security-first, local-first PDF intelligence server for 
 Most PDF tools dump a document into model context. PDF Decompiler returns only the evidence your agent asks for, protects local files with explicit access roots, and escalates to selected images only when text is not enough.
 
 Local-first describes this MCP server, not necessarily the entire AI stack. Your MCP client may send returned text, tables, images, names, financial details, or other document content to its configured language-model provider. For end-to-end local processing, use a client backed by a local model. Otherwise, review the client's and model provider's data controls before opening sensitive PDFs.
-
-[![Windows CI](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml)
-[![Best-effort compatibility](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml)
 
 ## What it does
 
