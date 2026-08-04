@@ -3,11 +3,13 @@
 [![Windows CI](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/ci.yml)
 [![Best-effort compatibility](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml/badge.svg?branch=main)](https://github.com/noobieisgod/PDF-Decompiler-MCP/actions/workflows/compatibility.yml)
 
-## Give your AI agent eyes for PDFs without flooding its context
+## Security-first PDF access without flooding your AI's context
 
 PDF Decompiler MCP lets an assistant search and read large PDFs as cited text, tables, and structured elements first, then inspect only the images or pages that actually need visual evidence. A 94-page annual report can be opened once and queried selectively instead of being pasted into the model in full.
 
-It runs locally, sends no telemetry, and gives you explicit control over which folders the assistant may read. It is designed for MCP clients including ChatGPT and Codex, Claude Desktop, and other compatible clients.
+Parsing, OCR, indexing, and caching run on your machine. The server sends no telemetry, denies local-file access until you configure allowed folders, and uses bounded responses so the client receives only the requested evidence. It is designed for MCP clients including ChatGPT and Codex, Claude Desktop, and other compatible clients.
+
+> **Privacy boundary:** Local-first describes this MCP server, not necessarily the entire AI stack. Your MCP client may send returned text, tables, images, names, financial details, or other document content to its configured language-model provider. For end-to-end local processing, use a client backed by a local model. Otherwise, review the client's and model provider's data controls before opening sensitive PDFs.
 
 ## What it does
 
@@ -15,6 +17,7 @@ It runs locally, sends no telemetry, and gives you explicit control over which f
 - Retrieve cited paragraphs, headings, tables, links, annotations, and Markdown.
 - Start in low-token text mode, then request figures or page renders only when needed.
 - Process scans with optional local Tesseract OCR.
+- Keep PDF parsing, OCR, indexing, and cache storage local with no server telemetry.
 - Handle large documents with hard budgets and resumable cursors.
 
 For most users, setup is three steps: install the server, run `doctor`, and connect one desktop app. The technical model, cache, security, and retrieval contracts remain documented below for users who need them.
@@ -182,7 +185,7 @@ node src/index.mjs --allow-root C:\documents D:\reports --deny-root C:\documents
 
 Unrestricted local access requires the explicit `--unrestricted-local-access` flag or corresponding environment setting. UNC access requires a separate explicit opt-in. HTTPS loading rejects credentials, non-HTTPS schemes, special or private network ranges, prohibited IPv6 transition ranges, overlong redirects, oversized responses, and DNS rebinding by connecting only to the addresses validated for each redirect.
 
-The server sends no telemetry. Details and threat boundaries are in [`SECURITY.md`](SECURITY.md).
+The server sends no telemetry and does not call an AI service. Content returned through MCP leaves the server's trust boundary and is then governed by the MCP client's configuration and the selected model provider. Use a local-model client when document content must remain on the machine. Details and threat boundaries are in [`SECURITY.md`](SECURITY.md) and [`docs/PRIVACY.md`](docs/PRIVACY.md).
 
 ## Cache modes and privacy
 
